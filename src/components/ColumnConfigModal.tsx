@@ -46,9 +46,18 @@ export const ColumnConfigModal = ({
           let existingOptions: string[] = [];
           
           if (Array.isArray(column.options)) {
-            existingOptions = column.options.filter(option => 
-              typeof option === 'string' && option.trim().length > 0
-            );
+            // Filter and convert each option to string, ensuring only valid strings are included
+            existingOptions = column.options
+              .map(option => {
+                // Convert to string and trim
+                if (typeof option === 'string') {
+                  return option.trim();
+                } else if (typeof option === 'number' || typeof option === 'boolean') {
+                  return String(option).trim();
+                }
+                return null;
+              })
+              .filter((option): option is string => option !== null && option.length > 0);
           }
           
           console.log('Loading existing options:', existingOptions);
