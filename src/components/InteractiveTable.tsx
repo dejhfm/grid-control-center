@@ -141,6 +141,7 @@ export const InteractiveTable = ({
                   row={row}
                   rowIndex={rowIndex}
                   mode={mode}
+                  tableId={tableId}
                   onCellUpdate={updateCellValue}
                 />
               ))}

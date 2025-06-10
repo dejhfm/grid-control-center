@@ -3,12 +3,14 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CellData, TableMode } from "@/hooks/useTableState";
+import { PdfUploadCell } from "@/components/PdfUploadCell";
 
 interface TableCellProps {
   cell: CellData;
   rowIndex: number;
   colIndex: number;
   mode: TableMode;
+  tableId: string;
   onCellUpdate: (rowIndex: number, colIndex: number, value: any) => void;
 }
 
@@ -17,9 +19,10 @@ export const TableCell = ({
   rowIndex, 
   colIndex, 
   mode, 
+  tableId,
   onCellUpdate 
 }: TableCellProps) => {
-  const cellKey = `${rowIndex}-${colIndex}-${cell.value}`;
+  // Remove cellKey to fix text input bug - React doesn't need to recreate components
   
   if (mode === 'view') {
     switch (cell.type) {
@@ -27,6 +30,17 @@ export const TableCell = ({
         return <Checkbox checked={Boolean(cell.value)} disabled />;
       case 'select':
         return <span className="text-sm">{cell.value || '-'}</span>;
+      case 'pdf_upload':
+        return (
+          <PdfUploadCell
+            value={cell.value}
+            rowIndex={rowIndex}
+            colIndex={colIndex}
+            tableId={tableId}
+            onCellUpdate={onCellUpdate}
+            disabled={true}
+          />
+        );
       default:
         return <span className="text-sm">{cell.value || '-'}</span>;
     }
@@ -36,7 +50,6 @@ export const TableCell = ({
     case 'checkbox':
       return (
         <Checkbox
-          key={cellKey}
           checked={Boolean(cell.value)}
           onCheckedChange={(checked) => {
             console.log('Checkbox changed:', { rowIndex, colIndex, checked });
@@ -47,7 +60,6 @@ export const TableCell = ({
     case 'select':
       return (
         <Select 
-          key={cellKey}
           value={String(cell.value || '')} 
           onValueChange={(value) => {
             console.log('Select changed:', { rowIndex, colIndex, value });
@@ -64,10 +76,20 @@ export const TableCell = ({
           </SelectContent>
         </Select>
       );
+    case 'pdf_upload':
+      return (
+        <PdfUploadCell
+          value={cell.value}
+          rowIndex={rowIndex}
+          colIndex={colIndex}
+          tableId={tableId}
+          onCellUpdate={onCellUpdate}
+          disabled={false}
+        />
+      );
     default:
       return (
         <Input
-          key={cellKey}
           value={String(cell.value || '')}
           onChange={(e) => {
             console.log('Input changed:', { rowIndex, colIndex, value: e.target.value });

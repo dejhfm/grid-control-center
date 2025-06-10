@@ -6,6 +6,7 @@ interface TableRowProps {
   row: CellData[];
   rowIndex: number;
   mode: TableMode;
+  tableId: string;
   onCellUpdate: (rowIndex: number, colIndex: number, value: any) => void;
 }
 
@@ -13,6 +14,7 @@ export const TableRow = ({
   row, 
   rowIndex, 
   mode, 
+  tableId,
   onCellUpdate 
 }: TableRowProps) => {
   return (
@@ -24,6 +26,7 @@ export const TableRow = ({
             rowIndex={rowIndex}
             colIndex={colIndex}
             mode={mode}
+            tableId={tableId}
             onCellUpdate={onCellUpdate}
           />
         </td>

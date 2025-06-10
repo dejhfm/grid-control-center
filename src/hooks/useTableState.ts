@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Tables } from '@/integrations/supabase/types';
 
-export type CellType = 'text' | 'checkbox' | 'select';
+export type CellType = 'text' | 'checkbox' | 'select' | 'pdf_upload';
 export type TableMode = 'view' | 'edit' | 'structure';
 
 export interface CellData {
@@ -60,7 +60,7 @@ export const useTableState = (
 
   const addRow = () => {
     const newRow = columns.map(col => ({
-      value: col.column_type === 'checkbox' ? false : '',
+      value: col.column_type === 'checkbox' ? false : col.column_type === 'pdf_upload' ? null : '',
       type: col.column_type as CellType,
       options: col.options as string[] | undefined
     }));

@@ -20,7 +20,7 @@ interface ColumnConfigModalProps {
 }
 
 export const ColumnConfigModal = ({ isOpen, onClose, column }: ColumnConfigModalProps) => {
-  const [columnType, setColumnType] = useState<'text' | 'checkbox' | 'select'>(column.column_type);
+  const [columnType, setColumnType] = useState<'text' | 'checkbox' | 'select' | 'pdf_upload'>(column.column_type as any);
   const [options, setOptions] = useState<string[]>((column.options as string[]) || []);
   const [newOption, setNewOption] = useState('');
   const { toast } = useToast();
@@ -80,7 +80,7 @@ export const ColumnConfigModal = ({ isOpen, onClose, column }: ColumnConfigModal
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium mb-2 block">Feld-Typ</label>
-            <Select value={columnType} onValueChange={(value: 'text' | 'checkbox' | 'select') => setColumnType(value)}>
+            <Select value={columnType} onValueChange={(value: 'text' | 'checkbox' | 'select' | 'pdf_upload') => setColumnType(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -88,6 +88,7 @@ export const ColumnConfigModal = ({ isOpen, onClose, column }: ColumnConfigModal
                 <SelectItem value="text">Textfeld</SelectItem>
                 <SelectItem value="checkbox">Checkbox</SelectItem>
                 <SelectItem value="select">Dropdown-Liste</SelectItem>
+                <SelectItem value="pdf_upload">PDF-Upload</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -122,6 +123,15 @@ export const ColumnConfigModal = ({ isOpen, onClose, column }: ColumnConfigModal
                   </Badge>
                 ))}
               </div>
+            </div>
+          )}
+
+          {columnType === 'pdf_upload' && (
+            <div className="bg-muted/50 p-3 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                PDF-Upload-Spalten erlauben es Benutzern, PDF-Dateien hochzuladen, herunterzuladen und zu verwalten. 
+                Die Dateien werden sicher gespeichert und können jederzeit abgerufen werden.
+              </p>
             </div>
           )}
 
