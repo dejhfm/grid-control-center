@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -92,7 +91,6 @@ const validateDayEntry = (entry: any, username?: string): DayEntry => {
       return createDefaultDayEntry(true, username);
     }
 
-    // Sichere Kategorie-Behandlung
     let category = '';
     try {
       category = String(entry.category || '').trim();
@@ -101,12 +99,10 @@ const validateDayEntry = (entry: any, username?: string): DayEntry => {
       category = '';
     }
     
-    // Fallback auf 'no-category' wenn leer oder ungültig
     if (!category || category === '') {
       category = 'no-category';
     }
 
-    // Sichere Zahlen-Konvertierung
     let hours = 0;
     let minutes = 0;
     try {
@@ -151,7 +147,6 @@ const validateWeekData = (data: any, username?: string): WeeklyScheduleData => {
           if (Array.isArray(data[key])) {
             result[key] = data[key].map((entry: any) => validateDayEntry(entry, username));
           } else {
-            // Legacy-Unterstützung
             const legacyEntry = validateDayEntry(data[key], username);
             if (legacyEntry.text || legacyEntry.category !== 'no-category' || legacyEntry.hours > 0 || legacyEntry.minutes > 0) {
               legacyEntry.isConfirmed = true;
@@ -162,7 +157,7 @@ const validateWeekData = (data: any, username?: string): WeeklyScheduleData => {
         }
       } catch (error) {
         console.error(`Error processing day ${key}:`, error);
-        result[key] = []; // Fallback auf leeres Array
+        result[key] = [];
       }
     });
 
@@ -178,7 +173,6 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Verbesserte sichere Verarbeitung der Dropdown-Optionen - HIER IST DER FIX!
   const safeDropdownOptions = useMemo(() => {
     try {
       if (!dropdownOptions || !Array.isArray(dropdownOptions)) {
@@ -188,14 +182,13 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
       
       const filteredOptions = dropdownOptions
         .filter((option: any) => {
-          // Sehr strenge Filterung - alles was leer, null, undefined oder nur Whitespace ist wird entfernt
           if (option == null) return false;
           const stringValue = String(option).trim();
           if (stringValue === '' || stringValue === 'undefined' || stringValue === 'null') return false;
           return true;
         })
         .map((option: any) => String(option).trim())
-        .filter((option: string) => option.length > 0); // Zusätzliche Sicherheit
+        .filter((option: string) => option.length > 0);
       
       console.log('Processed dropdown options:', filteredOptions);
       return filteredOptions;
@@ -205,7 +198,6 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
     }
   }, [dropdownOptions]);
 
-  // Sichere Datenextraktion mit Fallbacks
   const safeData = useMemo(() => {
     try {
       if (!entry || typeof entry !== 'object') {
@@ -219,12 +211,10 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
         };
       }
 
-      // Sichere Kategorie-Behandlung - VERBESSERUNG FÜR SELECT
       let category = 'no-category';
       try {
         if (entry.category && String(entry.category).trim() !== '') {
           const categoryStr = String(entry.category).trim();
-          // Prüfe ob die Kategorie in den verfügbaren Optionen ist
           if (safeDropdownOptions.length > 0 && !safeDropdownOptions.includes(categoryStr)) {
             console.warn(`Category "${categoryStr}" not in options, using fallback`);
             category = 'no-category';
@@ -237,7 +227,6 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
         category = 'no-category';
       }
 
-      // Sichere Zahlen-Konvertierung
       let hours = 0;
       let minutes = 0;
       try {
@@ -270,7 +259,6 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
     }
   }, [entry, safeDropdownOptions]);
 
-  // Fehlerbehandlung für Update-Funktionen
   const safeUpdate = (field: string, value: any) => {
     try {
       if (!onUpdate || typeof onUpdate !== 'function') {
@@ -327,7 +315,6 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
     }
   };
 
-  // Fehler-UI
   if (hasError) {
     return (
       <div className="border rounded-lg p-3 bg-red-50 border-red-200">
@@ -350,7 +337,6 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
     );
   }
 
-  // Ungültige Daten
   if (!safeData.isValid) {
     return (
       <div className="border rounded-lg p-3 bg-yellow-50 border-yellow-200">
@@ -366,7 +352,6 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
     if (entry?.isEditing && !disabled) {
       return (
         <div className="space-y-3">
-          {/* Dauer-Eingabe */}
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium min-w-[60px]">Dauer:</span>
             <div className="flex items-center gap-2">
@@ -393,14 +378,12 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
             </div>
           </div>
 
-          {/* Kategorie-Dropdown - HIER IST DER HAUPTFIX! */}
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium min-w-[60px]">Kategorie:</span>
             {safeDropdownOptions.length > 0 ? (
               <Select
                 value={safeData.category === 'no-category' ? '' : safeData.category}
                 onValueChange={(value) => {
-                  // Sichere Verarbeitung des neuen Werts
                   const processedValue = value && String(value).trim() !== '' ? String(value).trim() : 'no-category';
                   console.log('Select value changed:', value, 'processed:', processedValue);
                   safeUpdate('category', processedValue);
@@ -412,7 +395,6 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
                 <SelectContent className="bg-background z-50">
                   <SelectItem value="no-category-select">Keine Kategorie</SelectItem>
                   {safeDropdownOptions.map((option: string, index: number) => {
-                    // Zusätzliche Sicherheit - niemals leere Strings als value verwenden
                     if (!option || option.trim() === '') {
                       console.warn('Skipping empty option at index', index);
                       return null;
@@ -435,7 +417,6 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
             )}
           </div>
 
-          {/* Notizen-Textfeld */}
           <div className="flex gap-2">
             <span className="text-sm font-medium min-w-[60px] mt-2">Notizen:</span>
             <Textarea
@@ -447,7 +428,6 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
             />
           </div>
 
-          {/* Aktions-Buttons */}
           <div className="flex justify-end gap-2">
             <Button
               variant="outline"
@@ -471,7 +451,6 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
         </div>
       );
     } else {
-      // Read-only Modus
       return (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -557,7 +536,6 @@ const WeeklySchedulePopupContent = ({
     }
   }, [user]);
 
-  // Sichere Initialisierung der Daten
   useEffect(() => {
     if (!isOpen) return;
 
@@ -628,7 +606,6 @@ const WeeklySchedulePopupContent = ({
           if (field === 'hours' || field === 'minutes') {
             processedValue = Math.max(0, Math.min(field === 'hours' ? 23 : 59, Number(newValue) || 0));
           } else if (field === 'category') {
-            // Spezielle Behandlung für 'no-category-select' Wert
             if (newValue === 'no-category-select') {
               processedValue = 'no-category';
             } else {
@@ -740,7 +717,6 @@ const WeeklySchedulePopupContent = ({
     }
   };
 
-  // Sichere Dropdown-Optionen verarbeitung
   const safeDropdownOptions = useMemo(() => {
     try {
       if (!dropdownOptions || !Array.isArray(dropdownOptions)) {
@@ -749,7 +725,7 @@ const WeeklySchedulePopupContent = ({
       return dropdownOptions
         .filter(option => option != null && String(option).trim().length > 0)
         .map(option => String(option))
-        .filter(option => option.trim() !== ''); // Zusätzliche Sicherheit
+        .filter(option => option.trim() !== '');
     } catch (error) {
       console.error('Error processing dropdown options:', error);
       return [];
@@ -760,7 +736,6 @@ const WeeklySchedulePopupContent = ({
     return null;
   }
 
-  // Fehler-UI für das gesamte Popup
   if (hasError) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -904,7 +879,6 @@ const WeeklySchedulePopupContent = ({
               <Save className="w-4 h-4 mr-2" />
               Speichern
             </Button>
-          </Button>
           )}
         </DialogFooter>
       </DialogContent>
