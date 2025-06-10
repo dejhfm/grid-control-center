@@ -120,14 +120,14 @@ export const useUpdateColumn = () => {
       options,
     }: {
       columnId: string;
-      columnType: 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks';
+      columnType: 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks' | 'weekly_schedule';
       options?: string[];
     }) => {
       const { data, error } = await supabase
         .from('table_columns')
         .update({
           column_type: columnType,
-          options: columnType === 'select' ? options : null,
+          options: columnType === 'select' || columnType === 'weekly_schedule' ? options : null,
         })
         .eq('id', columnId)
         .select()

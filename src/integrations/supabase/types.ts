@@ -356,6 +356,7 @@ export type Database = {
         | "select"
         | "pdf_upload"
         | "calendar_weeks"
+        | "weekly_schedule"
       permission_level: "owner" | "editor" | "viewer"
     }
     CompositeTypes: {
@@ -478,6 +479,7 @@ export const Constants = {
         "select",
         "pdf_upload",
         "calendar_weeks",
+        "weekly_schedule",
       ],
       permission_level: ["owner", "editor", "viewer"],
     },
