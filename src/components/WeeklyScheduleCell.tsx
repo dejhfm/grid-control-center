@@ -19,6 +19,13 @@ interface WeeklyScheduleCellProps {
   disabled?: boolean;
 }
 
+const createDefaultDayEntry = () => ({
+  text: '',
+  category: '',
+  hours: 0,
+  minutes: 0,
+});
+
 export const WeeklyScheduleCell = ({
   value,
   onChange,
@@ -32,9 +39,15 @@ export const WeeklyScheduleCell = ({
     
     let totalMinutes = 0;
     try {
-      Object.values(data).forEach(day => {
+      // Safely iterate through days
+      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
+      
+      days.forEach(dayKey => {
+        const day = data[dayKey];
         if (day && typeof day === 'object') {
-          totalMinutes += ((day.hours || 0) * 60) + (day.minutes || 0);
+          const hours = typeof day.hours === 'number' && !isNaN(day.hours) ? day.hours : 0;
+          const minutes = typeof day.minutes === 'number' && !isNaN(day.minutes) ? day.minutes : 0;
+          totalMinutes += (hours * 60) + minutes;
         }
       });
     } catch (error) {
@@ -47,13 +60,55 @@ export const WeeklyScheduleCell = ({
     return `${hours}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  const hasData = value && Object.values(value).some(day => 
-    day && (day.text?.trim() || day.category || (day.hours || 0) > 0 || (day.minutes || 0) > 0)
-  );
+  const hasData = React.useMemo(() => {
+    try {
+      if (!value || typeof value !== 'object') {
+        return false;
+      }
+
+      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
+      
+      return days.some(dayKey => {
+        const day = value[dayKey];
+        if (!day || typeof day !== 'object') {
+          return false;
+        }
+        
+        return (
+          (typeof day.text === 'string' && day.text.trim().length > 0) ||
+          (typeof day.category === 'string' && day.category.trim().length > 0) ||
+          (typeof day.hours === 'number' && day.hours > 0) ||
+          (typeof day.minutes === 'number' && day.minutes > 0)
+        );
+      });
+    } catch (error) {
+      console.error('Error checking if data exists:', error);
+      return false;
+    }
+  }, [value]);
 
   const handleOpenPopup = () => {
     if (!disabled) {
+      console.log('Opening WeeklySchedule popup with value:', value);
+      console.log('Dropdown options:', dropdownOptions);
       setIsPopupOpen(true);
+    }
+  };
+
+  const handleSave = (data: WeeklyScheduleData) => {
+    try {
+      console.log('WeeklyScheduleCell: Saving data:', data);
+      onChange(data);
+    } catch (error) {
+      console.error('Error in WeeklyScheduleCell handleSave:', error);
+    }
+  };
+
+  const handleClose = () => {
+    try {
+      setIsPopupOpen(false);
+    } catch (error) {
+      console.error('Error closing WeeklySchedule popup:', error);
     }
   };
 
@@ -73,9 +128,9 @@ export const WeeklyScheduleCell = ({
       {isPopupOpen && (
         <WeeklySchedulePopup
           isOpen={isPopupOpen}
-          onClose={() => setIsPopupOpen(false)}
+          onClose={handleClose}
           value={value}
-          onSave={onChange}
+          onSave={handleSave}
           dropdownOptions={dropdownOptions}
         />
       )}

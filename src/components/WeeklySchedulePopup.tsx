@@ -30,20 +30,20 @@ interface WeeklySchedulePopupProps {
   dropdownOptions?: string[] | null;
 }
 
-const defaultDayEntry: DayEntry = {
+const createDefaultDayEntry = (): DayEntry => ({
   text: '',
   category: '',
   hours: 0,
   minutes: 0,
-};
+});
 
-const defaultWeekData: WeeklyScheduleData = {
-  monday: { ...defaultDayEntry },
-  tuesday: { ...defaultDayEntry },
-  wednesday: { ...defaultDayEntry },
-  thursday: { ...defaultDayEntry },
-  friday: { ...defaultDayEntry },
-};
+const createDefaultWeekData = (): WeeklyScheduleData => ({
+  monday: createDefaultDayEntry(),
+  tuesday: createDefaultDayEntry(),
+  wednesday: createDefaultDayEntry(),
+  thursday: createDefaultDayEntry(),
+  friday: createDefaultDayEntry(),
+});
 
 const weekDays = [
   { key: 'monday', label: 'Montag' },
@@ -53,6 +53,50 @@ const weekDays = [
   { key: 'friday', label: 'Freitag' },
 ] as const;
 
+// Helper function to safely validate and fix day entry data
+const validateDayEntry = (entry: any): DayEntry => {
+  try {
+    if (!entry || typeof entry !== 'object') {
+      console.log('Invalid day entry, using default:', entry);
+      return createDefaultDayEntry();
+    }
+
+    return {
+      text: typeof entry.text === 'string' ? entry.text : '',
+      category: typeof entry.category === 'string' ? entry.category : '',
+      hours: typeof entry.hours === 'number' && !isNaN(entry.hours) ? entry.hours : 0,
+      minutes: typeof entry.minutes === 'number' && !isNaN(entry.minutes) ? entry.minutes : 0,
+    };
+  } catch (error) {
+    console.error('Error validating day entry:', error);
+    return createDefaultDayEntry();
+  }
+};
+
+// Helper function to safely validate and fix week data
+const validateWeekData = (data: any): WeeklyScheduleData => {
+  try {
+    if (!data || typeof data !== 'object') {
+      console.log('Invalid week data, using default:', data);
+      return createDefaultWeekData();
+    }
+
+    const validatedData: WeeklyScheduleData = {
+      monday: validateDayEntry(data.monday),
+      tuesday: validateDayEntry(data.tuesday),
+      wednesday: validateDayEntry(data.wednesday),
+      thursday: validateDayEntry(data.thursday),
+      friday: validateDayEntry(data.friday),
+    };
+
+    console.log('Validated week data:', validatedData);
+    return validatedData;
+  } catch (error) {
+    console.error('Error validating week data:', error);
+    return createDefaultWeekData();
+  }
+};
+
 export const WeeklySchedulePopup = ({
   isOpen,
   onClose,
@@ -60,39 +104,91 @@ export const WeeklySchedulePopup = ({
   onSave,
   dropdownOptions = null,
 }: WeeklySchedulePopupProps) => {
-  const [weekData, setWeekData] = useState<WeeklyScheduleData>(defaultWeekData);
+  const [weekData, setWeekData] = useState<WeeklyScheduleData>(createDefaultWeekData());
 
   useEffect(() => {
     if (isOpen) {
-      if (value) {
-        setWeekData(value);
-      } else {
-        setWeekData(defaultWeekData);
+      try {
+        console.log('WeeklySchedulePopup opening with value:', value);
+        console.log('Dropdown options:', dropdownOptions);
+        
+        if (value) {
+          const validatedData = validateWeekData(value);
+          setWeekData(validatedData);
+        } else {
+          setWeekData(createDefaultWeekData());
+        }
+      } catch (error) {
+        console.error('Error in WeeklySchedulePopup useEffect:', error);
+        setWeekData(createDefaultWeekData());
       }
     }
   }, [value, isOpen]);
 
   const updateDayEntry = (day: keyof WeeklyScheduleData, field: keyof DayEntry, newValue: any) => {
-    setWeekData(prev => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        [field]: newValue,
-      },
-    }));
+    try {
+      console.log('Updating day entry:', { day, field, newValue });
+      
+      setWeekData(prev => {
+        // Ensure the day exists and is valid
+        const currentDay = prev[day] || createDefaultDayEntry();
+        
+        let processedValue = newValue;
+        
+        // Type-safe value processing
+        if (field === 'hours' || field === 'minutes') {
+          processedValue = typeof newValue === 'number' && !isNaN(newValue) ? newValue : 0;
+        } else {
+          processedValue = typeof newValue === 'string' ? newValue : '';
+        }
+
+        const updatedData = {
+          ...prev,
+          [day]: {
+            ...currentDay,
+            [field]: processedValue,
+          },
+        };
+        
+        console.log('Updated week data:', updatedData);
+        return updatedData;
+      });
+    } catch (error) {
+      console.error('Error updating day entry:', error);
+    }
   };
 
   const handleSave = () => {
-    onSave(weekData);
-    onClose();
+    try {
+      console.log('Saving week data:', weekData);
+      onSave(weekData);
+      onClose();
+    } catch (error) {
+      console.error('Error saving week data:', error);
+    }
   };
 
   const handleClose = () => {
-    onClose();
+    try {
+      onClose();
+    } catch (error) {
+      console.error('Error closing popup:', error);
+    }
   };
 
-  // Ensure dropdownOptions is an array
-  const safeDropdownOptions = Array.isArray(dropdownOptions) ? dropdownOptions : [];
+  // Safely process dropdown options
+  const safeDropdownOptions = React.useMemo(() => {
+    try {
+      if (Array.isArray(dropdownOptions)) {
+        return dropdownOptions.filter(option => typeof option === 'string' && option.trim().length > 0);
+      }
+      return [];
+    } catch (error) {
+      console.error('Error processing dropdown options:', error);
+      return [];
+    }
+  }, [dropdownOptions]);
+
   const hasDropdownOptions = safeDropdownOptions.length > 0;
 
   if (!isOpen) {
@@ -107,74 +203,79 @@ export const WeeklySchedulePopup = ({
         </DialogHeader>
         
         <div className="space-y-6">
-          {weekDays.map(({ key, label }) => (
-            <div key={key} className="border rounded-lg p-4 bg-muted/20">
-              <h3 className="font-medium mb-3 text-sm">{label}</h3>
-              
-              <div className="grid grid-cols-1 gap-4">
-                {/* Duration Input */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium min-w-[60px]">Dauer:</span>
+          {weekDays.map(({ key, label }) => {
+            // Safely get day data with fallback
+            const dayData = weekData[key] || createDefaultDayEntry();
+            
+            return (
+              <div key={key} className="border rounded-lg p-4 bg-muted/20">
+                <h3 className="font-medium mb-3 text-sm">{label}</h3>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Duration Input */}
                   <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min="0"
-                      max="23"
-                      value={weekData[key].hours}
-                      onChange={(e) => updateDayEntry(key, 'hours', parseInt(e.target.value) || 0)}
-                      className="w-20"
-                      placeholder="0"
-                    />
-                    <span className="text-sm">h</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="59"
-                      value={weekData[key].minutes}
-                      onChange={(e) => updateDayEntry(key, 'minutes', parseInt(e.target.value) || 0)}
-                      className="w-20"
-                      placeholder="0"
-                    />
-                    <span className="text-sm">min</span>
+                    <span className="text-sm font-medium min-w-[60px]">Dauer:</span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="23"
+                        value={dayData.hours || 0}
+                        onChange={(e) => updateDayEntry(key, 'hours', parseInt(e.target.value) || 0)}
+                        className="w-20"
+                        placeholder="0"
+                      />
+                      <span className="text-sm">h</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="59"
+                        value={dayData.minutes || 0}
+                        onChange={(e) => updateDayEntry(key, 'minutes', parseInt(e.target.value) || 0)}
+                        className="w-20"
+                        placeholder="0"
+                      />
+                      <span className="text-sm">min</span>
+                    </div>
                   </div>
-                </div>
 
-                {/* Category Dropdown */}
-                {hasDropdownOptions && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium min-w-[60px]">Kategorie:</span>
-                    <Select
-                      value={weekData[key].category}
-                      onValueChange={(value) => updateDayEntry(key, 'category', value)}
-                    >
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Kategorie auswählen..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-background">
-                        {safeDropdownOptions.map((option, i) => (
-                          <SelectItem key={i} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {/* Category Dropdown */}
+                  {hasDropdownOptions && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium min-w-[60px]">Kategorie:</span>
+                      <Select
+                        value={dayData.category || ''}
+                        onValueChange={(value) => updateDayEntry(key, 'category', value)}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Kategorie auswählen..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-background">
+                          {safeDropdownOptions.map((option, i) => (
+                            <SelectItem key={`${option}-${i}`} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Text Area */}
+                  <div className="flex gap-2">
+                    <span className="text-sm font-medium min-w-[60px] mt-2">Notizen:</span>
+                    <Textarea
+                      value={dayData.text || ''}
+                      onChange={(e) => updateDayEntry(key, 'text', e.target.value)}
+                      placeholder="Eintrag für diesen Tag..."
+                      className="flex-1 min-h-[80px]"
+                      maxLength={1000}
+                    />
                   </div>
-                )}
-
-                {/* Text Area */}
-                <div className="flex gap-2">
-                  <span className="text-sm font-medium min-w-[60px] mt-2">Notizen:</span>
-                  <Textarea
-                    value={weekData[key].text}
-                    onChange={(e) => updateDayEntry(key, 'text', e.target.value)}
-                    placeholder="Eintrag für diesen Tag..."
-                    className="flex-1 min-h-[80px]"
-                    maxLength={1000}
-                  />
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <DialogFooter className="flex gap-2">

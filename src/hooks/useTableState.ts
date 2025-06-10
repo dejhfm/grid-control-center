@@ -12,6 +12,41 @@ export interface CellData {
   year?: number;
 }
 
+// Helper function to create default weekly schedule data
+const createDefaultWeeklySchedule = () => ({
+  monday: { text: '', category: '', hours: 0, minutes: 0 },
+  tuesday: { text: '', category: '', hours: 0, minutes: 0 },
+  wednesday: { text: '', category: '', hours: 0, minutes: 0 },
+  thursday: { text: '', category: '', hours: 0, minutes: 0 },
+  friday: { text: '', category: '', hours: 0, minutes: 0 },
+});
+
+// Helper function to validate weekly schedule data
+const validateWeeklyScheduleData = (data: any) => {
+  try {
+    if (!data || typeof data !== 'object') {
+      return null;
+    }
+
+    // Check if it has the expected structure
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+    const hasValidStructure = days.every(day => {
+      const dayData = data[day];
+      return dayData && typeof dayData === 'object';
+    });
+
+    if (hasValidStructure) {
+      return data;
+    } else {
+      console.log('Invalid weekly schedule structure, returning null');
+      return null;
+    }
+  } catch (error) {
+    console.error('Error validating weekly schedule data:', error);
+    return null;
+  }
+};
+
 export const useTableState = (
   columns: Tables<'table_columns'>[],
   tableData: Tables<'table_data'>[]
@@ -41,13 +76,32 @@ export const useTableState = (
         );
         
         let cellValue;
-        if (column.column_type === 'checkbox') {
-          cellValue = cellData?.value === true || cellData?.value === 'true';
-        } else if (column.column_type === 'weekly_schedule') {
-          // For weekly_schedule, ensure we have a proper default structure
-          cellValue = cellData?.value || null;
-        } else {
-          cellValue = cellData?.value || '';
+        
+        try {
+          if (column.column_type === 'checkbox') {
+            cellValue = cellData?.value === true || cellData?.value === 'true';
+          } else if (column.column_type === 'weekly_schedule') {
+            // Special handling for weekly_schedule data
+            if (cellData?.value) {
+              cellValue = validateWeeklyScheduleData(cellData.value);
+            } else {
+              cellValue = null;
+            }
+            console.log(`Row ${rowIndex}, Col ${colIndex} - Weekly schedule value:`, cellValue);
+          } else {
+            cellValue = cellData?.value || '';
+          }
+        } catch (error) {
+          console.error(`Error processing cell value for row ${rowIndex}, col ${colIndex}:`, error);
+          
+          // Fallback based on column type
+          if (column.column_type === 'checkbox') {
+            cellValue = false;
+          } else if (column.column_type === 'weekly_schedule') {
+            cellValue = null;
+          } else {
+            cellValue = '';
+          }
         }
         
         // Extract year from options for calendar_weeks type
@@ -56,10 +110,23 @@ export const useTableState = (
           year = (column.options as any)?.year;
         }
         
+        // Safely extract options for weekly_schedule
+        let options;
+        if (column.column_type === 'weekly_schedule' && column.options) {
+          try {
+            options = Array.isArray(column.options) ? column.options : [];
+          } catch (error) {
+            console.error('Error processing weekly_schedule options:', error);
+            options = [];
+          }
+        } else {
+          options = column.options as string[] | undefined;
+        }
+        
         row.push({
           value: cellValue,
           type: column.column_type as CellType,
-          options: column.options as string[] | undefined,
+          options: options,
           year: year,
         });
       }
@@ -78,13 +145,19 @@ export const useTableState = (
   const addRow = () => {
     const newRow = columns.map(col => {
       let defaultValue;
-      if (col.column_type === 'checkbox') {
-        defaultValue = false;
-      } else if (col.column_type === 'pdf_upload') {
-        defaultValue = null;
-      } else if (col.column_type === 'weekly_schedule') {
-        defaultValue = null;
-      } else {
+      
+      try {
+        if (col.column_type === 'checkbox') {
+          defaultValue = false;
+        } else if (col.column_type === 'pdf_upload') {
+          defaultValue = null;
+        } else if (col.column_type === 'weekly_schedule') {
+          defaultValue = null;
+        } else {
+          defaultValue = '';
+        }
+      } catch (error) {
+        console.error('Error creating default value for new row:', error);
         defaultValue = '';
       }
 
@@ -93,10 +166,22 @@ export const useTableState = (
         year = (col.options as any)?.year;
       }
 
+      let options;
+      try {
+        if (col.column_type === 'weekly_schedule' && col.options) {
+          options = Array.isArray(col.options) ? col.options : [];
+        } else {
+          options = col.options as string[] | undefined;
+        }
+      } catch (error) {
+        console.error('Error processing options for new row:', error);
+        options = col.options as string[] | undefined;
+      }
+
       return {
         value: defaultValue,
         type: col.column_type as CellType,
-        options: col.options as string[] | undefined,
+        options: options,
         year: year,
       };
     });
