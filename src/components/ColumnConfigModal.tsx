@@ -11,11 +11,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Plus, X } from 'lucide-react';
 import { Tables } from '@/integrations/supabase/types';
 import { useUpdateColumn } from '@/hooks/useTableData';
 import { useToast } from '@/hooks/use-toast';
+
+type ColumnType = 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks' | 'weekly_schedule';
 
 interface ColumnConfigModalProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ export const ColumnConfigModal = ({
   onClose,
   column,
 }: ColumnConfigModalProps) => {
-  const [columnType, setColumnType] = useState(column.column_type);
+  const [columnType, setColumnType] = useState<ColumnType>(column.column_type as ColumnType);
   const [options, setOptions] = useState<string[]>([]);
   const [newOption, setNewOption] = useState('');
   const updateColumnMutation = useUpdateColumn();
@@ -36,12 +37,21 @@ export const ColumnConfigModal = ({
 
   useEffect(() => {
     if (isOpen) {
-      setColumnType(column.column_type);
+      setColumnType(column.column_type as ColumnType);
       
       // Load existing options for select and weekly_schedule columns
       if ((column.column_type === 'select' || column.column_type === 'weekly_schedule') && column.options) {
         try {
-          const existingOptions = Array.isArray(column.options) ? column.options : [];
+          // Safely convert JSON options to string array
+          let existingOptions: string[] = [];
+          
+          if (Array.isArray(column.options)) {
+            existingOptions = column.options.filter(option => 
+              typeof option === 'string' && option.trim().length > 0
+            );
+          }
+          
+          console.log('Loading existing options:', existingOptions);
           setOptions(existingOptions);
         } catch (error) {
           console.error('Error loading column options:', error);
@@ -71,9 +81,11 @@ export const ColumnConfigModal = ({
         ? options 
         : undefined;
 
+      console.log('Saving column with options:', finalOptions);
+
       await updateColumnMutation.mutateAsync({
         columnId: column.id,
-        columnType: columnType as any,
+        columnType: columnType,
         options: finalOptions,
       });
 
@@ -93,6 +105,10 @@ export const ColumnConfigModal = ({
     }
   };
 
+  const handleColumnTypeChange = (value: string) => {
+    setColumnType(value as ColumnType);
+  };
+
   const shouldShowOptions = columnType === 'select' || columnType === 'weekly_schedule';
 
   return (
@@ -105,7 +121,7 @@ export const ColumnConfigModal = ({
         <div className="space-y-4">
           <div>
             <Label htmlFor="column-type">Spaltentyp</Label>
-            <Select value={columnType} onValueChange={setColumnType}>
+            <Select value={columnType} onValueChange={handleColumnTypeChange}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
