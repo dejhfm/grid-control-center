@@ -28,19 +28,56 @@ const validateWeeklyScheduleData = (data: any) => {
       return null;
     }
 
-    // Check if it has the expected structure
+    // Check for new array-based structure first
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-    const hasValidStructure = days.every(day => {
-      const dayData = data[day];
-      return dayData && typeof dayData === 'object';
-    });
-
-    if (hasValidStructure) {
-      return data;
+    const hasArrayStructure = days.some(day => Array.isArray(data[day]));
+    
+    if (hasArrayStructure) {
+      // New array-based structure
+      const isValid = days.every(day => {
+        const dayData = data[day];
+        return Array.isArray(dayData) && dayData.every(entry => 
+          entry && typeof entry === 'object' && 
+          typeof entry.id === 'string'
+        );
+      });
+      
+      if (isValid) {
+        return data;
+      }
     } else {
-      console.log('Invalid weekly schedule structure, returning null');
-      return null;
+      // Check for legacy single entry structure
+      const hasValidLegacyStructure = days.every(day => {
+        const dayData = data[day];
+        return !dayData || (dayData && typeof dayData === 'object');
+      });
+
+      if (hasValidLegacyStructure) {
+        // Convert legacy structure to new array structure
+        const convertedData: any = {};
+        days.forEach(day => {
+          const dayData = data[day];
+          if (dayData && (dayData.text || dayData.category || dayData.hours > 0 || dayData.minutes > 0)) {
+            convertedData[day] = [{
+              id: Math.random().toString(36).substr(2, 9),
+              text: String(dayData.text || ''),
+              category: String(dayData.category || ''),
+              hours: Number(dayData.hours) || 0,
+              minutes: Number(dayData.minutes) || 0,
+              isConfirmed: true,
+              isEditing: false,
+            }];
+          } else {
+            convertedData[day] = [];
+          }
+        });
+        console.log('Converted legacy weekly schedule data:', convertedData);
+        return convertedData;
+      }
     }
+
+    console.log('Invalid weekly schedule structure, returning null');
+    return null;
   } catch (error) {
     console.error('Error validating weekly schedule data:', error);
     return null;

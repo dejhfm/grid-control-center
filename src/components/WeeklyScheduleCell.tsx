@@ -5,12 +5,22 @@ import { Calendar } from 'lucide-react';
 import { WeeklySchedulePopup } from './WeeklySchedulePopup';
 import { ErrorBoundary } from './ErrorBoundary';
 
+interface DayEntry {
+  id: string;
+  text: string;
+  category: string;
+  hours: number;
+  minutes: number;
+  isConfirmed: boolean;
+  isEditing: boolean;
+}
+
 interface WeeklyScheduleData {
-  monday: { text: string; category: string; hours: number; minutes: number };
-  tuesday: { text: string; category: string; hours: number; minutes: number };
-  wednesday: { text: string; category: string; hours: number; minutes: number };
-  thursday: { text: string; category: string; hours: number; minutes: number };
-  friday: { text: string; category: string; hours: number; minutes: number };
+  monday: DayEntry[];
+  tuesday: DayEntry[];
+  wednesday: DayEntry[];
+  thursday: DayEntry[];
+  friday: DayEntry[];
 }
 
 interface WeeklyScheduleCellProps {
@@ -35,10 +45,19 @@ const WeeklyScheduleCellContent = ({
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
     
     days.forEach(dayKey => {
-      const day = data[dayKey];
-      if (day && typeof day === 'object') {
-        const hours = Number(day.hours) || 0;
-        const minutes = Number(day.minutes) || 0;
+      const dayEntries = data[dayKey];
+      if (Array.isArray(dayEntries)) {
+        dayEntries.forEach(entry => {
+          if (entry && typeof entry === 'object' && entry.isConfirmed) {
+            const hours = Number(entry.hours) || 0;
+            const minutes = Number(entry.minutes) || 0;
+            totalMinutes += (hours * 60) + minutes;
+          }
+        });
+      } else if (dayEntries && typeof dayEntries === 'object') {
+        // Legacy support for old single entry format
+        const hours = Number(dayEntries.hours) || 0;
+        const minutes = Number(dayEntries.minutes) || 0;
         totalMinutes += (hours * 60) + minutes;
       }
     });
@@ -56,19 +75,48 @@ const WeeklyScheduleCellContent = ({
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
     
     return days.some(dayKey => {
-      const day = value[dayKey];
-      if (!day || typeof day !== 'object') {
-        return false;
+      const dayEntries = value[dayKey];
+      if (Array.isArray(dayEntries)) {
+        return dayEntries.some(entry => {
+          if (!entry || typeof entry !== 'object') return false;
+          return (
+            (entry.text && entry.text.trim().length > 0) ||
+            (entry.category && entry.category.trim().length > 0) ||
+            (Number(entry.hours) > 0) ||
+            (Number(entry.minutes) > 0)
+          );
+        });
+      } else if (dayEntries && typeof dayEntries === 'object') {
+        // Legacy support for old single entry format
+        return (
+          (dayEntries.text && dayEntries.text.trim().length > 0) ||
+          (dayEntries.category && dayEntries.category.trim().length > 0) ||
+          (Number(dayEntries.hours) > 0) ||
+          (Number(dayEntries.minutes) > 0)
+        );
       }
-      
-      return (
-        (day.text && day.text.trim().length > 0) ||
-        (day.category && day.category.trim().length > 0) ||
-        (Number(day.hours) > 0) ||
-        (Number(day.minutes) > 0)
-      );
+      return false;
     });
   }, [value]);
+
+  const getConfirmedEntryCount = (data: WeeklyScheduleData | null): number => {
+    if (!data) return 0;
+    
+    let count = 0;
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
+    
+    days.forEach(dayKey => {
+      const dayEntries = data[dayKey];
+      if (Array.isArray(dayEntries)) {
+        count += dayEntries.filter(entry => entry.isConfirmed).length;
+      } else if (dayEntries && typeof dayEntries === 'object') {
+        // Legacy support: count as one confirmed entry
+        count += 1;
+      }
+    });
+    
+    return count;
+  };
 
   const handleOpenPopup = () => {
     if (!disabled) {
@@ -96,6 +144,8 @@ const WeeklyScheduleCellContent = ({
     );
   }, [dropdownOptions]);
 
+  const confirmedCount = getConfirmedEntryCount(value);
+
   return (
     <>
       <Button
@@ -106,7 +156,10 @@ const WeeklyScheduleCellContent = ({
         className="w-full"
       >
         <Calendar className="w-4 h-4 mr-2" />
-        {hasData ? `Woche: ${getTotalHours(value)}` : 'Eintrag'}
+        {hasData 
+          ? `${confirmedCount} Einträge • ${getTotalHours(value)}` 
+          : 'Eintrag'
+        }
       </Button>
 
       {isPopupOpen && (
