@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -54,45 +54,30 @@ const weekDays = [
 ] as const;
 
 const validateDayEntry = (entry: any): DayEntry => {
-  try {
-    if (!entry || typeof entry !== 'object') {
-      console.log('Invalid day entry, using default:', entry);
-      return createDefaultDayEntry();
-    }
-
-    return {
-      text: typeof entry.text === 'string' ? entry.text : '',
-      category: typeof entry.category === 'string' ? entry.category : '',
-      hours: typeof entry.hours === 'number' && !isNaN(entry.hours) ? entry.hours : 0,
-      minutes: typeof entry.minutes === 'number' && !isNaN(entry.minutes) ? entry.minutes : 0,
-    };
-  } catch (error) {
-    console.error('Error validating day entry:', error);
+  if (!entry || typeof entry !== 'object') {
     return createDefaultDayEntry();
   }
+
+  return {
+    text: typeof entry.text === 'string' ? entry.text : '',
+    category: typeof entry.category === 'string' ? entry.category : '',
+    hours: typeof entry.hours === 'number' && !isNaN(entry.hours) ? entry.hours : 0,
+    minutes: typeof entry.minutes === 'number' && !isNaN(entry.minutes) ? entry.minutes : 0,
+  };
 };
 
 const validateWeekData = (data: any): WeeklyScheduleData => {
-  try {
-    if (!data || typeof data !== 'object') {
-      console.log('Invalid week data, using default:', data);
-      return createDefaultWeekData();
-    }
-
-    const validatedData: WeeklyScheduleData = {
-      monday: validateDayEntry(data.monday),
-      tuesday: validateDayEntry(data.tuesday),
-      wednesday: validateDayEntry(data.wednesday),
-      thursday: validateDayEntry(data.thursday),
-      friday: validateDayEntry(data.friday),
-    };
-
-    console.log('Validated week data:', validatedData);
-    return validatedData;
-  } catch (error) {
-    console.error('Error validating week data:', error);
+  if (!data || typeof data !== 'object') {
     return createDefaultWeekData();
   }
+
+  return {
+    monday: validateDayEntry(data.monday),
+    tuesday: validateDayEntry(data.tuesday),
+    wednesday: validateDayEntry(data.wednesday),
+    thursday: validateDayEntry(data.thursday),
+    friday: validateDayEntry(data.friday),
+  };
 };
 
 export const WeeklySchedulePopup = ({
@@ -107,9 +92,6 @@ export const WeeklySchedulePopup = ({
   useEffect(() => {
     if (isOpen) {
       try {
-        console.log('WeeklySchedulePopup opening with value:', value);
-        console.log('Dropdown options:', dropdownOptions);
-        
         if (value) {
           const validatedData = validateWeekData(value);
           setWeekData(validatedData);
@@ -125,8 +107,6 @@ export const WeeklySchedulePopup = ({
 
   const updateDayEntry = (day: keyof WeeklyScheduleData, field: keyof DayEntry, newValue: any) => {
     try {
-      console.log('Updating day entry:', { day, field, newValue });
-      
       setWeekData(prev => {
         const currentDay = prev[day] || createDefaultDayEntry();
         
@@ -138,16 +118,13 @@ export const WeeklySchedulePopup = ({
           processedValue = typeof newValue === 'string' ? newValue : '';
         }
 
-        const updatedData = {
+        return {
           ...prev,
           [day]: {
             ...currentDay,
             [field]: processedValue,
           },
         };
-        
-        console.log('Updated week data:', updatedData);
-        return updatedData;
       });
     } catch (error) {
       console.error('Error updating day entry:', error);
@@ -156,7 +133,6 @@ export const WeeklySchedulePopup = ({
 
   const handleSave = () => {
     try {
-      console.log('Saving week data:', weekData);
       onSave(weekData);
       onClose();
     } catch (error) {
@@ -172,7 +148,7 @@ export const WeeklySchedulePopup = ({
     }
   };
 
-  const safeDropdownOptions = React.useMemo(() => {
+  const safeDropdownOptions = useMemo(() => {
     try {
       if (Array.isArray(dropdownOptions)) {
         return dropdownOptions.filter(option => typeof option === 'string' && option.trim().length > 0);

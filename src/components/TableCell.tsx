@@ -56,6 +56,22 @@ export const TableCell = ({
     }
   };
   
+  // Sichere Extraktion der dropdown options
+  const getSafeDropdownOptions = (options: any): string[] => {
+    try {
+      if (Array.isArray(options)) {
+        return options
+          .filter(opt => opt != null && typeof opt === 'string')
+          .map(opt => opt.trim())
+          .filter(opt => opt.length > 0);
+      }
+      return [];
+    } catch (error) {
+      console.error('Error processing dropdown options:', error);
+      return [];
+    }
+  };
+  
   if (mode === 'view') {
     switch (cell.type) {
       case 'checkbox':
@@ -84,7 +100,7 @@ export const TableCell = ({
           <WeeklyScheduleCell
             value={cell.value}
             onChange={(value) => onCellUpdate(rowIndex, colIndex, value)}
-            dropdownOptions={cell.options}
+            dropdownOptions={getSafeDropdownOptions(cell.options)}
             disabled={true}
           />
         );
@@ -175,7 +191,7 @@ export const TableCell = ({
             console.log('Weekly schedule changed:', { rowIndex, colIndex, value });
             onCellUpdate(rowIndex, colIndex, value);
           }}
-          dropdownOptions={cell.options}
+          dropdownOptions={getSafeDropdownOptions(cell.options)}
           disabled={false}
         />
       );

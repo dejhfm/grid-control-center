@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from 'lucide-react';
 import { WeeklySchedulePopup } from './WeeklySchedulePopup';
@@ -19,13 +19,6 @@ interface WeeklyScheduleCellProps {
   disabled?: boolean;
 }
 
-const createDefaultDayEntry = () => ({
-  text: '',
-  category: '',
-  hours: 0,
-  minutes: 0,
-});
-
 export const WeeklyScheduleCell = ({
   value,
   onChange,
@@ -39,7 +32,6 @@ export const WeeklyScheduleCell = ({
     
     let totalMinutes = 0;
     try {
-      // Safely iterate through days
       const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
       
       days.forEach(dayKey => {
@@ -60,7 +52,7 @@ export const WeeklyScheduleCell = ({
     return `${hours}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  const hasData = React.useMemo(() => {
+  const hasData = useMemo(() => {
     try {
       if (!value || typeof value !== 'object') {
         return false;
@@ -89,15 +81,12 @@ export const WeeklyScheduleCell = ({
 
   const handleOpenPopup = () => {
     if (!disabled) {
-      console.log('Opening WeeklySchedule popup with value:', value);
-      console.log('Dropdown options:', dropdownOptions);
       setIsPopupOpen(true);
     }
   };
 
   const handleSave = (data: WeeklyScheduleData) => {
     try {
-      console.log('WeeklyScheduleCell: Saving data:', data);
       onChange(data);
     } catch (error) {
       console.error('Error in WeeklyScheduleCell handleSave:', error);
@@ -111,6 +100,21 @@ export const WeeklyScheduleCell = ({
       console.error('Error closing WeeklySchedule popup:', error);
     }
   };
+
+  // Sichere Verarbeitung der dropdownOptions
+  const safeDropdownOptions = useMemo(() => {
+    try {
+      if (Array.isArray(dropdownOptions)) {
+        return dropdownOptions.filter(option => 
+          typeof option === 'string' && option.trim().length > 0
+        );
+      }
+      return [];
+    } catch (error) {
+      console.error('Error processing dropdown options:', error);
+      return [];
+    }
+  }, [dropdownOptions]);
 
   return (
     <>
@@ -131,7 +135,7 @@ export const WeeklyScheduleCell = ({
           onClose={handleClose}
           value={value}
           onSave={handleSave}
-          dropdownOptions={dropdownOptions}
+          dropdownOptions={safeDropdownOptions}
         />
       )}
     </>
