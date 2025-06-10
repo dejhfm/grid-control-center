@@ -15,14 +15,14 @@ interface WeeklyScheduleData {
 interface WeeklyScheduleCellProps {
   value: WeeklyScheduleData | null;
   onChange: (value: WeeklyScheduleData) => void;
-  dropdownOptions?: string[];
+  dropdownOptions?: string[] | null;
   disabled?: boolean;
 }
 
 export const WeeklyScheduleCell = ({
   value,
   onChange,
-  dropdownOptions = [],
+  dropdownOptions = null,
   disabled = false,
 }: WeeklyScheduleCellProps) => {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -31,9 +31,16 @@ export const WeeklyScheduleCell = ({
     if (!data) return '0:00';
     
     let totalMinutes = 0;
-    Object.values(data).forEach(day => {
-      totalMinutes += (day.hours * 60) + day.minutes;
-    });
+    try {
+      Object.values(data).forEach(day => {
+        if (day && typeof day === 'object') {
+          totalMinutes += ((day.hours || 0) * 60) + (day.minutes || 0);
+        }
+      });
+    } catch (error) {
+      console.error('Error calculating total hours:', error);
+      return '0:00';
+    }
     
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
@@ -41,15 +48,21 @@ export const WeeklyScheduleCell = ({
   };
 
   const hasData = value && Object.values(value).some(day => 
-    day.text.trim() || day.category || day.hours > 0 || day.minutes > 0
+    day && (day.text?.trim() || day.category || (day.hours || 0) > 0 || (day.minutes || 0) > 0)
   );
+
+  const handleOpenPopup = () => {
+    if (!disabled) {
+      setIsPopupOpen(true);
+    }
+  };
 
   return (
     <>
       <Button
         variant={hasData ? "default" : "outline"}
         size="sm"
-        onClick={() => setIsPopupOpen(true)}
+        onClick={handleOpenPopup}
         disabled={disabled}
         className="w-full"
       >
@@ -57,13 +70,15 @@ export const WeeklyScheduleCell = ({
         {hasData ? `Woche: ${getTotalHours(value)}` : 'Eintrag'}
       </Button>
 
-      <WeeklySchedulePopup
-        isOpen={isPopupOpen}
-        onClose={() => setIsPopupOpen(false)}
-        value={value}
-        onSave={onChange}
-        dropdownOptions={dropdownOptions}
-      />
+      {isPopupOpen && (
+        <WeeklySchedulePopup
+          isOpen={isPopupOpen}
+          onClose={() => setIsPopupOpen(false)}
+          value={value}
+          onSave={onChange}
+          dropdownOptions={dropdownOptions}
+        />
+      )}
     </>
   );
 };

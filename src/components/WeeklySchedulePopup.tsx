@@ -27,7 +27,7 @@ interface WeeklySchedulePopupProps {
   onClose: () => void;
   value: WeeklyScheduleData | null;
   onSave: (data: WeeklyScheduleData) => void;
-  dropdownOptions?: string[];
+  dropdownOptions?: string[] | null;
 }
 
 const defaultDayEntry: DayEntry = {
@@ -58,15 +58,17 @@ export const WeeklySchedulePopup = ({
   onClose,
   value,
   onSave,
-  dropdownOptions = [],
+  dropdownOptions = null,
 }: WeeklySchedulePopupProps) => {
   const [weekData, setWeekData] = useState<WeeklyScheduleData>(defaultWeekData);
 
   useEffect(() => {
-    if (value) {
-      setWeekData(value);
-    } else {
-      setWeekData(defaultWeekData);
+    if (isOpen) {
+      if (value) {
+        setWeekData(value);
+      } else {
+        setWeekData(defaultWeekData);
+      }
     }
   }, [value, isOpen]);
 
@@ -88,6 +90,14 @@ export const WeeklySchedulePopup = ({
   const handleClose = () => {
     onClose();
   };
+
+  // Ensure dropdownOptions is an array
+  const safeDropdownOptions = Array.isArray(dropdownOptions) ? dropdownOptions : [];
+  const hasDropdownOptions = safeDropdownOptions.length > 0;
+
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -130,7 +140,7 @@ export const WeeklySchedulePopup = ({
                 </div>
 
                 {/* Category Dropdown */}
-                {dropdownOptions.length > 0 && (
+                {hasDropdownOptions && (
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium min-w-[60px]">Kategorie:</span>
                     <Select
@@ -141,7 +151,7 @@ export const WeeklySchedulePopup = ({
                         <SelectValue placeholder="Kategorie auswählen..." />
                       </SelectTrigger>
                       <SelectContent className="bg-background">
-                        {dropdownOptions.map((option, i) => (
+                        {safeDropdownOptions.map((option, i) => (
                           <SelectItem key={i} value={option}>
                             {option}
                           </SelectItem>
