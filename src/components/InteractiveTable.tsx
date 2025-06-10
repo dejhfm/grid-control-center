@@ -1,12 +1,13 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Edit, Settings, Plus, Trash } from "lucide-react";
-import { useTableColumns, useTableData, useUpdateCellValue } from "@/hooks/useTableData";
+import { Eye, Edit, Settings, Plus, Trash, Cog } from "lucide-react";
+import { useTableColumns, useTableData, useUpdateCellValue, useUpdateColumn } from "@/hooks/useTableData";
+import { ColumnConfigModal } from "@/components/ColumnConfigModal";
 import { Tables } from "@/integrations/supabase/types";
 
 type CellType = 'text' | 'checkbox' | 'select';
@@ -32,9 +33,11 @@ export const InteractiveTable = ({
   canStructure = true 
 }: InteractiveTableProps) => {
   const [mode, setMode] = useState<TableMode>('view');
+  const [configColumn, setConfigColumn] = useState<Tables<'table_columns'> | null>(null);
   const { data: columns = [], isLoading: columnsLoading } = useTableColumns(tableId);
   const { data: tableData = [], isLoading: dataLoading } = useTableData(tableId);
   const updateCellMutation = useUpdateCellValue();
+  const updateColumnMutation = useUpdateColumn();
 
   // Transform database data into the component's expected format
   const [data, setData] = useState<CellData[][]>([]);
@@ -71,11 +74,15 @@ export const InteractiveTable = ({
     }
   }, [columns, tableData]);
 
-  const updateCellValue = async (rowIndex: number, colIndex: number, value: any) => {
+  const updateCellValue = useCallback(async (rowIndex: number, colIndex: number, value: any) => {
     // Update local state immediately for better UX
-    const newData = [...data];
-    newData[rowIndex][colIndex] = { ...newData[rowIndex][colIndex], value };
-    setData(newData);
+    setData(prevData => {
+      const newData = [...prevData];
+      if (newData[rowIndex] && newData[rowIndex][colIndex]) {
+        newData[rowIndex][colIndex] = { ...newData[rowIndex][colIndex], value };
+      }
+      return newData;
+    });
 
     // Update in database
     const column = columns[colIndex];
@@ -90,15 +97,20 @@ export const InteractiveTable = ({
       } catch (error) {
         console.error('Error updating cell:', error);
         // Revert local state on error
-        const revertedData = [...data];
-        revertedData[rowIndex][colIndex] = { 
-          ...revertedData[rowIndex][colIndex], 
-          value: tableData.find(d => d.row_index === rowIndex && d.column_id === column.id)?.value || ''
-        };
-        setData(revertedData);
+        setData(prevData => {
+          const revertedData = [...prevData];
+          const originalValue = tableData.find(d => d.row_index === rowIndex && d.column_id === column.id)?.value;
+          if (revertedData[rowIndex] && revertedData[rowIndex][colIndex]) {
+            revertedData[rowIndex][colIndex] = { 
+              ...revertedData[rowIndex][colIndex], 
+              value: originalValue || ''
+            };
+          }
+          return revertedData;
+        });
       }
     }
-  };
+  }, [columns, tableData, tableId, updateCellMutation]);
 
   const addRow = () => {
     const newRow = columns.map(col => ({
@@ -131,9 +143,9 @@ export const InteractiveTable = ({
         );
       case 'select':
         return (
-          <Select value={cell.value} onValueChange={(value) => updateCellValue(rowIndex, colIndex, value)}>
+          <Select value={cell.value || ''} onValueChange={(value) => updateCellValue(rowIndex, colIndex, value)}>
             <SelectTrigger className="w-full">
-              <SelectValue />
+              <SelectValue placeholder="Auswählen..." />
             </SelectTrigger>
             <SelectContent className="bg-background">
               {cell.options?.map((option, i) => (
@@ -145,7 +157,7 @@ export const InteractiveTable = ({
       default:
         return (
           <Input
-            value={cell.value}
+            value={cell.value || ''}
             onChange={(e) => updateCellValue(rowIndex, colIndex, e.target.value)}
             className="w-full"
           />
@@ -228,7 +240,18 @@ export const InteractiveTable = ({
               <tr>
                 {columns.map((column) => (
                   <th key={column.id} className="p-3 text-left font-medium">
-                    {column.name}
+                    <div className="flex items-center justify-between">
+                      <span>{column.name}</span>
+                      {mode === 'structure' && canStructure && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setConfigColumn(column)}
+                        >
+                          <Cog className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </th>
                 ))}
               </tr>
@@ -247,7 +270,7 @@ export const InteractiveTable = ({
           </table>
         </div>
         
-        {mode === 'structure' && (
+        {(mode === 'edit' || mode === 'structure') && canEdit && (
           <div className="p-3 border-t bg-muted/50">
             <Button size="sm" onClick={addRow} variant="outline">
               <Plus className="w-4 h-4 mr-2" />
@@ -256,6 +279,14 @@ export const InteractiveTable = ({
           </div>
         )}
       </div>
+
+      {configColumn && (
+        <ColumnConfigModal
+          isOpen={!!configColumn}
+          onClose={() => setConfigColumn(null)}
+          column={configColumn}
+        />
+      )}
     </div>
   );
 };

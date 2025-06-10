@@ -74,3 +74,35 @@ export const useUpdateCellValue = () => {
     },
   });
 };
+
+export const useUpdateColumn = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      columnId,
+      columnType,
+      options,
+    }: {
+      columnId: string;
+      columnType: 'text' | 'checkbox' | 'select';
+      options?: string[];
+    }) => {
+      const { data, error } = await supabase
+        .from('table_columns')
+        .update({
+          column_type: columnType,
+          options: columnType === 'select' ? options : null,
+        })
+        .eq('id', columnId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['table-columns', data.table_id] });
+    },
+  });
+};

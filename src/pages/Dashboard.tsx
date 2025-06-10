@@ -4,11 +4,33 @@ import { Header } from "@/components/Header";
 import { TableCard } from "@/components/TableCard";
 import { CreateTableModal } from "@/components/CreateTableModal";
 import { InteractiveTable } from "@/components/InteractiveTable";
+import { PermissionsModal } from "@/components/PermissionsModal";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTables, useCreateTable } from "@/hooks/useTables";
+import { useTableStats } from "@/hooks/useTableStats";
 import { useToast } from "@/hooks/use-toast";
+
+const TableCardWithStats = ({ table, onOpen, onEdit, onManagePermissions, userPermission }: any) => {
+  const { data: stats } = useTableStats(table.id);
+  
+  return (
+    <TableCard
+      table={{
+        ...table,
+        rows: stats?.rowCount || 0,
+        columns: stats?.columnCount || 0,
+        lastModified: new Date(table.updated_at).toLocaleDateString('de-DE'),
+        permissions: userPermission as 'owner' | 'edit' | 'view',
+        collaborators: table.table_permissions.length + 1,
+      }}
+      onOpen={onOpen}
+      onEdit={onEdit}
+      onManagePermissions={onManagePermissions}
+    />
+  );
+};
 
 export const Dashboard = () => {
   const { user, signOut } = useAuth();
@@ -19,6 +41,7 @@ export const Dashboard = () => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'table'>('dashboard');
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [permissionsModalTable, setPermissionsModalTable] = useState<string | null>(null);
 
   const handleOpenTable = (tableId: string) => {
     setSelectedTable(tableId);
@@ -131,21 +154,13 @@ export const Dashboard = () => {
               : table.table_permissions.find(p => p.user_id === user?.id)?.permission || 'viewer';
 
             return (
-              <TableCard
+              <TableCardWithStats
                 key={table.id}
-                table={{
-                  id: table.id,
-                  name: table.name,
-                  description: table.description || '',
-                  rows: 0, // Will be calculated from actual data
-                  columns: 0, // Will be calculated from actual data
-                  lastModified: new Date(table.updated_at).toLocaleDateString('de-DE'),
-                  permissions: userPermission as 'owner' | 'edit' | 'view',
-                  collaborators: table.table_permissions.length + 1,
-                }}
+                table={table}
+                userPermission={userPermission}
                 onOpen={handleOpenTable}
-                onEdit={(id) => console.log('Edit table:', id)}
-                onManagePermissions={(id) => console.log('Manage permissions:', id)}
+                onEdit={(id: string) => console.log('Edit table:', id)}
+                onManagePermissions={(id: string) => setPermissionsModalTable(id)}
               />
             );
           })}
@@ -167,6 +182,12 @@ export const Dashboard = () => {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreate={handleCreateTable}
+      />
+
+      <PermissionsModal
+        isOpen={!!permissionsModalTable}
+        onClose={() => setPermissionsModalTable(null)}
+        tableId={permissionsModalTable || ''}
       />
     </div>
   );

@@ -51,7 +51,6 @@ export const Login = () => {
     <LoginForm 
       onLogin={handleLogin}
       onRegister={handleRegister}
-      isLoading={isLoading}
     />
   );
 };
