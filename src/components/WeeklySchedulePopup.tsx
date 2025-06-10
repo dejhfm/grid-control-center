@@ -173,6 +173,7 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // VERBESSERTE sichere Verarbeitung der Dropdown-Optionen
   const safeDropdownOptions = useMemo(() => {
     try {
       if (!dropdownOptions || !Array.isArray(dropdownOptions)) {
@@ -182,13 +183,19 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
       
       const filteredOptions = dropdownOptions
         .filter((option: any) => {
+          // Sehr strenge Filterung
           if (option == null) return false;
           const stringValue = String(option).trim();
           if (stringValue === '' || stringValue === 'undefined' || stringValue === 'null') return false;
+          // Zusätzliche Prüfung auf minimale Länge
+          if (stringValue.length < 1) return false;
           return true;
         })
         .map((option: any) => String(option).trim())
-        .filter((option: string) => option.length > 0);
+        .filter((option: string, index: number, arr: string[]) => {
+          // Duplikate entfernen und finale Validierung
+          return option.length > 0 && arr.indexOf(option) === index;
+        });
       
       console.log('Processed dropdown options:', filteredOptions);
       return filteredOptions;
@@ -378,6 +385,7 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
             </div>
           </div>
 
+          {/* Kategorie-Dropdown - FIXED VERSION */}
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium min-w-[60px]">Kategorie:</span>
             {safeDropdownOptions.length > 0 ? (
@@ -393,18 +401,24 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
                   <SelectValue placeholder="Kategorie auswählen..." />
                 </SelectTrigger>
                 <SelectContent className="bg-background z-50">
-                  <SelectItem value="no-category-select">Keine Kategorie</SelectItem>
+                  <SelectItem value="no-category-fallback">Keine Kategorie</SelectItem>
                   {safeDropdownOptions.map((option: string, index: number) => {
-                    if (!option || option.trim() === '') {
-                      console.warn('Skipping empty option at index', index);
+                    // KRITISCHER FIX: Zusätzliche Validierung vor dem Rendern
+                    const trimmedOption = String(option || '').trim();
+                    if (!trimmedOption || trimmedOption.length === 0) {
+                      console.warn('Skipping invalid option at index', index, 'value:', option);
                       return null;
                     }
+                    
+                    // Sicherstellen, dass der Wert niemals leer ist
+                    const safeValue = trimmedOption || `fallback-${index}`;
+                    
                     return (
                       <SelectItem 
-                        key={`${option}-${index}`} 
-                        value={option}
+                        key={`option-${index}-${safeValue}`} 
+                        value={safeValue}
                       >
-                        {option}
+                        {trimmedOption}
                       </SelectItem>
                     );
                   })}
@@ -893,3 +907,5 @@ export const WeeklySchedulePopup = (props: WeeklySchedulePopupProps) => {
     </ErrorBoundary>
   );
 };
+
+export default WeeklySchedulePopup;
