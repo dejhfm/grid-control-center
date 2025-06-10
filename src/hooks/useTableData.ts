@@ -120,7 +120,7 @@ export const useUpdateColumn = () => {
       options,
     }: {
       columnId: string;
-      columnType: 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks' | 'weekly_schedule';
+      columnType: 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks' | 'weekly_schedule' | 'user_dropdown';
       options?: any;
     }) => {
       console.log('Updating column:', { columnId, columnType, options });
@@ -129,8 +129,8 @@ export const useUpdateColumn = () => {
       let processedOptions = null;
       
       if (options !== undefined && options !== null) {
-        if (columnType === 'select' || columnType === 'weekly_schedule') {
-          // Für select und weekly_schedule: Array von Strings
+        if (columnType === 'select' || columnType === 'weekly_schedule' || columnType === 'user_dropdown') {
+          // Für select, weekly_schedule und user_dropdown: Array von Strings
           if (Array.isArray(options) && options.length > 0) {
             processedOptions = options.filter(opt => 
               opt != null && String(opt).trim().length > 0

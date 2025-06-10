@@ -13,6 +13,8 @@ interface DayEntry {
   minutes: number;
   isConfirmed: boolean;
   isEditing: boolean;
+  lastEditedBy?: string;
+  lastEditedAt?: string;
 }
 
 interface WeeklyScheduleData {
@@ -56,8 +58,9 @@ const WeeklyScheduleCellContent = ({
         });
       } else if (dayEntries && typeof dayEntries === 'object') {
         // Legacy support for old single entry format
-        const hours = Number(dayEntries.hours) || 0;
-        const minutes = Number(dayEntries.minutes) || 0;
+        const legacyEntry = dayEntries as any;
+        const hours = Number(legacyEntry.hours) || 0;
+        const minutes = Number(legacyEntry.minutes) || 0;
         totalMinutes += (hours * 60) + minutes;
       }
     });
@@ -88,11 +91,12 @@ const WeeklyScheduleCellContent = ({
         });
       } else if (dayEntries && typeof dayEntries === 'object') {
         // Legacy support for old single entry format
+        const legacyEntry = dayEntries as any;
         return (
-          (dayEntries.text && dayEntries.text.trim().length > 0) ||
-          (dayEntries.category && dayEntries.category.trim().length > 0) ||
-          (Number(dayEntries.hours) > 0) ||
-          (Number(dayEntries.minutes) > 0)
+          (legacyEntry.text && legacyEntry.text.trim().length > 0) ||
+          (legacyEntry.category && legacyEntry.category.trim().length > 0) ||
+          (Number(legacyEntry.hours) > 0) ||
+          (Number(legacyEntry.minutes) > 0)
         );
       }
       return false;
@@ -169,6 +173,7 @@ const WeeklyScheduleCellContent = ({
           value={value}
           onSave={handleSave}
           dropdownOptions={safeDropdownOptions}
+          disabled={disabled}
         />
       )}
     </>

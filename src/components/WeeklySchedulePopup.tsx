@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Save, X, Check, Edit, Plus } from 'lucide-react';
 import { ErrorBoundary } from './ErrorBoundary';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface DayEntry {
   id: string;
@@ -16,6 +17,8 @@ interface DayEntry {
   minutes: number;
   isConfirmed: boolean;
   isEditing: boolean;
+  lastEditedBy?: string;
+  lastEditedAt?: string;
 }
 
 interface WeeklyScheduleData {
@@ -32,9 +35,10 @@ interface WeeklySchedulePopupProps {
   value: WeeklyScheduleData | null;
   onSave: (data: WeeklyScheduleData) => void;
   dropdownOptions?: string[] | null;
+  disabled?: boolean;
 }
 
-const createDefaultDayEntry = (isEditing: boolean = true): DayEntry => ({
+const createDefaultDayEntry = (isEditing: boolean = true, username?: string): DayEntry => ({
   id: Math.random().toString(36).substr(2, 9),
   text: '',
   category: '',
@@ -42,6 +46,8 @@ const createDefaultDayEntry = (isEditing: boolean = true): DayEntry => ({
   minutes: 0,
   isConfirmed: false,
   isEditing: isEditing,
+  lastEditedBy: username,
+  lastEditedAt: new Date().toISOString(),
 });
 
 const createDefaultWeekData = (): WeeklyScheduleData => ({
@@ -60,9 +66,9 @@ const weekDays = [
   { key: 'friday', label: 'Freitag' },
 ] as const;
 
-const validateDayEntry = (entry: any): DayEntry => {
+const validateDayEntry = (entry: any, username?: string): DayEntry => {
   if (!entry || typeof entry !== 'object') {
-    return createDefaultDayEntry();
+    return createDefaultDayEntry(true, username);
   }
 
   return {
@@ -73,10 +79,12 @@ const validateDayEntry = (entry: any): DayEntry => {
     minutes: Number(entry.minutes) || 0,
     isConfirmed: Boolean(entry.isConfirmed),
     isEditing: Boolean(entry.isEditing),
+    lastEditedBy: entry.lastEditedBy || username,
+    lastEditedAt: entry.lastEditedAt || new Date().toISOString(),
   };
 };
 
-const validateWeekData = (data: any): WeeklyScheduleData => {
+const validateWeekData = (data: any, username?: string): WeeklyScheduleData => {
   if (!data || typeof data !== 'object') {
     return createDefaultWeekData();
   }
@@ -86,10 +94,10 @@ const validateWeekData = (data: any): WeeklyScheduleData => {
   weekDays.forEach(({ key }) => {
     if (data[key]) {
       if (Array.isArray(data[key])) {
-        result[key] = data[key].map(validateDayEntry);
+        result[key] = data[key].map((entry: any) => validateDayEntry(entry, username));
       } else {
         // Legacy support: convert old single entry format to array
-        const legacyEntry = validateDayEntry(data[key]);
+        const legacyEntry = validateDayEntry(data[key], username);
         if (legacyEntry.text || legacyEntry.category || legacyEntry.hours > 0 || legacyEntry.minutes > 0) {
           legacyEntry.isConfirmed = true;
           legacyEntry.isEditing = false;
@@ -108,26 +116,34 @@ const WeeklySchedulePopupContent = ({
   value,
   onSave,
   dropdownOptions = null,
+  disabled = false,
 }: WeeklySchedulePopupProps) => {
   const [weekData, setWeekData] = useState<WeeklyScheduleData>(createDefaultWeekData());
+  const { user } = useAuth();
+
+  const currentUsername = user?.user_metadata?.username || user?.email || 'Unbekannt';
 
   useEffect(() => {
     if (isOpen) {
       console.log('WeeklySchedulePopup opening with value:', value);
-      const validatedData = validateWeekData(value);
+      const validatedData = validateWeekData(value, currentUsername);
       console.log('Validated data:', validatedData);
       setWeekData(validatedData);
     }
-  }, [value, isOpen]);
+  }, [value, isOpen, currentUsername]);
 
   const addNewEntry = (day: keyof WeeklyScheduleData) => {
+    if (disabled) return;
+    
     setWeekData(prev => ({
       ...prev,
-      [day]: [...prev[day], createDefaultDayEntry(true)]
+      [day]: [...prev[day], createDefaultDayEntry(true, currentUsername)]
     }));
   };
 
   const updateDayEntry = (day: keyof WeeklyScheduleData, entryId: string, field: keyof DayEntry, newValue: any) => {
+    if (disabled) return;
+    
     console.log('Updating day entry:', { day, entryId, field, newValue });
     
     setWeekData(prev => ({
@@ -151,23 +167,35 @@ const WeeklySchedulePopupContent = ({
         return {
           ...entry,
           [field]: processedValue,
+          lastEditedBy: currentUsername,
+          lastEditedAt: new Date().toISOString(),
         };
       })
     }));
   };
 
   const confirmEntry = (day: keyof WeeklyScheduleData, entryId: string) => {
+    if (disabled) return;
+    
     setWeekData(prev => ({
       ...prev,
       [day]: prev[day].map(entry => 
         entry.id === entryId 
-          ? { ...entry, isConfirmed: true, isEditing: false }
+          ? { 
+              ...entry, 
+              isConfirmed: true, 
+              isEditing: false,
+              lastEditedBy: currentUsername,
+              lastEditedAt: new Date().toISOString(),
+            }
           : entry
       )
     }));
   };
 
   const deleteEntry = (day: keyof WeeklyScheduleData, entryId: string) => {
+    if (disabled) return;
+    
     setWeekData(prev => ({
       ...prev,
       [day]: prev[day].filter(entry => entry.id !== entryId)
@@ -175,17 +203,26 @@ const WeeklySchedulePopupContent = ({
   };
 
   const editEntry = (day: keyof WeeklyScheduleData, entryId: string) => {
+    if (disabled) return;
+    
     setWeekData(prev => ({
       ...prev,
       [day]: prev[day].map(entry => 
         entry.id === entryId 
-          ? { ...entry, isEditing: true }
+          ? { 
+              ...entry, 
+              isEditing: true,
+              lastEditedBy: currentUsername,
+              lastEditedAt: new Date().toISOString(),
+            }
           : entry
       )
     }));
   };
 
   const handleSave = () => {
+    if (disabled) return;
+    
     console.log('Saving week data:', weekData);
     onSave(weekData);
     onClose();
@@ -215,7 +252,9 @@ const WeeklySchedulePopupContent = ({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="bg-background max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Wochenplan bearbeiten</DialogTitle>
+          <DialogTitle>
+            {disabled ? 'Wochenplan ansehen' : 'Wochenplan bearbeiten'}
+          </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-6">
@@ -226,15 +265,17 @@ const WeeklySchedulePopupContent = ({
               <div key={key} className="border rounded-lg p-4 bg-muted/20">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-medium text-sm">{label}</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addNewEntry(key)}
-                    className="flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Neuer Eintrag
-                  </Button>
+                  {!disabled && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addNewEntry(key)}
+                      className="flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Neuer Eintrag
+                    </Button>
+                  )}
                 </div>
                 
                 <div className="space-y-4">
@@ -247,7 +288,7 @@ const WeeklySchedulePopupContent = ({
                           : 'bg-background border-border'
                       }`}
                     >
-                      {entry.isEditing ? (
+                      {entry.isEditing && !disabled ? (
                         // Editing mode
                         <div className="space-y-3">
                           <div className="flex items-center gap-2">
@@ -344,19 +385,32 @@ const WeeklySchedulePopupContent = ({
                                 </span>
                               )}
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => editEntry(key, entry.id)}
-                            >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Bearbeiten
-                            </Button>
+                            {!disabled && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => editEntry(key, entry.id)}
+                              >
+                                <Edit className="w-4 h-4 mr-1" />
+                                Bearbeiten
+                              </Button>
+                            )}
                           </div>
                           
                           {entry.text && (
                             <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
                               {entry.text}
+                            </div>
+                          )}
+                          
+                          {entry.lastEditedBy && (
+                            <div className="text-xs text-muted-foreground">
+                              Zuletzt bearbeitet von: {entry.lastEditedBy}
+                              {entry.lastEditedAt && (
+                                <span className="ml-2">
+                                  am {new Date(entry.lastEditedAt).toLocaleDateString('de-DE')}
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>
@@ -378,12 +432,14 @@ const WeeklySchedulePopupContent = ({
         <DialogFooter className="flex gap-2">
           <Button variant="outline" onClick={handleClose}>
             <X className="w-4 h-4 mr-2" />
-            Abbrechen
+            {disabled ? 'Schließen' : 'Abbrechen'}
           </Button>
-          <Button onClick={handleSave}>
-            <Save className="w-4 h-4 mr-2" />
-            Speichern
-          </Button>
+          {!disabled && (
+            <Button onClick={handleSave}>
+              <Save className="w-4 h-4 mr-2" />
+              Speichern
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

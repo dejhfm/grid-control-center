@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Tables } from '@/integrations/supabase/types';
 
-export type CellType = 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks' | 'weekly_schedule';
+export type CellType = 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks' | 'weekly_schedule' | 'user_dropdown';
 export type TableMode = 'view' | 'edit' | 'structure';
 
 export interface CellData {
@@ -147,9 +147,9 @@ export const useTableState = (
           year = (column.options as any)?.year;
         }
         
-        // Sichere Extraktion von Optionen für weekly_schedule und select
+        // Sichere Extraktion von Optionen für weekly_schedule, select und user_dropdown
         let options;
-        if ((column.column_type === 'weekly_schedule' || column.column_type === 'select') && column.options) {
+        if ((column.column_type === 'weekly_schedule' || column.column_type === 'select' || column.column_type === 'user_dropdown') && column.options) {
           try {
             if (Array.isArray(column.options)) {
               // Filtere null/undefined Werte und konvertiere zu Strings
@@ -200,6 +200,8 @@ export const useTableState = (
           defaultValue = null;
         } else if (col.column_type === 'weekly_schedule') {
           defaultValue = null;
+        } else if (col.column_type === 'user_dropdown') {
+          defaultValue = '';
         } else {
           defaultValue = '';
         }
@@ -215,7 +217,7 @@ export const useTableState = (
 
       let options;
       try {
-        if ((col.column_type === 'weekly_schedule' || col.column_type === 'select') && col.options) {
+        if ((col.column_type === 'weekly_schedule' || col.column_type === 'select' || col.column_type === 'user_dropdown') && col.options) {
           if (Array.isArray(col.options)) {
             options = col.options
               .filter(opt => opt != null)

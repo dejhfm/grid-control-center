@@ -1,3 +1,4 @@
+
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -5,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CellData, TableMode } from "@/hooks/useTableState";
 import { PdfUploadCellSecure } from "@/components/PdfUploadCellSecure";
 import { WeeklyScheduleCell } from "@/components/WeeklyScheduleCell";
+import { UserDropdownCell } from "@/components/UserDropdownCell";
 import { useState, useEffect } from "react";
 import { generateCalendarWeeks, parseCalendarWeekValue } from "@/utils/calendarWeeks";
 
@@ -101,6 +103,14 @@ export const TableCell = ({
             disabled={true}
           />
         );
+      case 'user_dropdown':
+        return (
+          <UserDropdownCell
+            value={cell.value}
+            onCellUpdate={() => {}}
+            disabled={true}
+          />
+        );
       default:
         const displayValue = String(cell.value || '-');
         // Show as textarea for longer text, single line for shorter text
@@ -189,6 +199,17 @@ export const TableCell = ({
             onCellUpdate(rowIndex, colIndex, value);
           }}
           dropdownOptions={getSafeDropdownOptions(cell.options)}
+          disabled={false}
+        />
+      );
+    case 'user_dropdown':
+      return (
+        <UserDropdownCell
+          value={cell.value}
+          onCellUpdate={(value) => {
+            console.log('User dropdown changed:', { rowIndex, colIndex, value });
+            onCellUpdate(rowIndex, colIndex, value);
+          }}
           disabled={false}
         />
       );
