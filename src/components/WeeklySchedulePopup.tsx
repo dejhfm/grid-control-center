@@ -212,7 +212,7 @@ const WeeklySchedulePopupContent = ({
                           <SelectValue placeholder="Kategorie auswählen..." />
                         </SelectTrigger>
                         <SelectContent className="bg-background z-50">
-                          <SelectItem value="">Keine Kategorie</SelectItem>
+                          <SelectItem value="no-category">Keine Kategorie</SelectItem>
                           {safeDropdownOptions.map((option, i) => (
                             <SelectItem key={`${option}-${i}`} value={option}>
                               {option}
