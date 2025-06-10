@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Tables } from '@/integrations/supabase/types';
 
-export type CellType = 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks';
+export type CellType = 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks' | 'weekly_schedule';
 export type TableMode = 'view' | 'edit' | 'structure';
 
 export interface CellData {

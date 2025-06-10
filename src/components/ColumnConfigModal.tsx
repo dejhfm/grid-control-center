@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -101,17 +100,20 @@ export const ColumnConfigModal = ({ isOpen, onClose, column }: ColumnConfigModal
                 <SelectItem value="select">Dropdown-Liste</SelectItem>
                 <SelectItem value="calendar_weeks">Dropdown-Liste mit Kalenderwochen</SelectItem>
                 <SelectItem value="pdf_upload">PDF-Upload</SelectItem>
+                <SelectItem value="weekly_schedule">Wochenplan-Eingabe</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {columnType === 'select' && (
+          {(columnType === 'select' || columnType === 'weekly_schedule') && (
             <div>
-              <label className="text-sm font-medium mb-2 block">Auswahlmöglichkeiten</label>
+              <label className="text-sm font-medium mb-2 block">
+                {columnType === 'weekly_schedule' ? 'Kategorie-Optionen für Wochenplan' : 'Auswahlmöglichkeiten'}
+              </label>
               
               <div className="flex gap-2 mb-2">
                 <Input
-                  placeholder="Neue Option hinzufügen"
+                  placeholder={columnType === 'weekly_schedule' ? "Neue Kategorie hinzufügen" : "Neue Option hinzufügen"}
                   value={newOption}
                   onChange={(e) => setNewOption(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && addOption()}
@@ -161,6 +163,16 @@ export const ColumnConfigModal = ({ isOpen, onClose, column }: ColumnConfigModal
               <p className="text-sm text-muted-foreground">
                 PDF-Upload-Spalten erlauben es Benutzern, PDF-Dateien hochzuladen, herunterzuladen und zu verwalten. 
                 Die Dateien werden sicher gespeichert und können jederzeit abgerufen werden.
+              </p>
+            </div>
+          )}
+
+          {columnType === 'weekly_schedule' && (
+            <div className="bg-muted/50 p-3 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                Wochenplan-Eingabe ermöglicht es Benutzern, strukturierte Wochenpläne zu erstellen. 
+                Für jeden Wochentag (Mo-Fr) können Notizen, Kategorien und Zeitangaben erfasst werden.
+                {options.length > 0 && " Die konfigurierten Kategorien stehen in den Dropdown-Feldern zur Verfügung."}
               </p>
             </div>
           )}

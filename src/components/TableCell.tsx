@@ -1,10 +1,10 @@
-
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CellData, TableMode } from "@/hooks/useTableState";
 import { PdfUploadCellSecure } from "@/components/PdfUploadCellSecure";
+import { WeeklyScheduleCell } from "@/components/WeeklyScheduleCell";
 import { useState, useEffect } from "react";
 import { generateCalendarWeeks, parseCalendarWeekValue } from "@/utils/calendarWeeks";
 
@@ -76,6 +76,15 @@ export const TableCell = ({
             colIndex={colIndex}
             tableId={tableId}
             onCellUpdate={onCellUpdate}
+            disabled={true}
+          />
+        );
+      case 'weekly_schedule':
+        return (
+          <WeeklyScheduleCell
+            value={cell.value}
+            onChange={(value) => onCellUpdate(rowIndex, colIndex, value)}
+            dropdownOptions={cell.options}
             disabled={true}
           />
         );
@@ -155,6 +164,18 @@ export const TableCell = ({
           colIndex={colIndex}
           tableId={tableId}
           onCellUpdate={onCellUpdate}
+          disabled={false}
+        />
+      );
+    case 'weekly_schedule':
+      return (
+        <WeeklyScheduleCell
+          value={cell.value}
+          onChange={(value) => {
+            console.log('Weekly schedule changed:', { rowIndex, colIndex, value });
+            onCellUpdate(rowIndex, colIndex, value);
+          }}
+          dropdownOptions={cell.options}
           disabled={false}
         />
       );
