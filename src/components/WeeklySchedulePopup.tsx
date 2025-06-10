@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -54,7 +53,6 @@ const createDefaultDayEntry = (isEditing: boolean = true, username?: string): Da
     };
   } catch (error) {
     console.error('Error creating default day entry:', error);
-    // Fallback für kritische Fehler
     return {
       id: 'fallback-' + Date.now(),
       text: '',
@@ -174,39 +172,192 @@ const validateWeekData = (data: any, username?: string): WeeklyScheduleData => {
   }
 };
 
-// Fehlerbehandlungs-Komponente für individuelle Einträge
+// Sichere Komponente für einzelne Einträge mit vollständiger Fehlerbehandlung
 const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm, onDelete, onEdit, dropdownOptions }: any) => {
   const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Sichere Verarbeitung der Dropdown-Optionen
+  const safeDropdownOptions = useMemo(() => {
+    try {
+      if (!dropdownOptions || !Array.isArray(dropdownOptions)) {
+        console.log('No valid dropdown options provided');
+        return [];
+      }
+      
+      const filteredOptions = dropdownOptions
+        .filter((option: any) => {
+          // Filtere null, undefined und leere Strings heraus
+          return option != null && 
+                 String(option).trim() !== '' && 
+                 String(option).trim() !== 'undefined' && 
+                 String(option).trim() !== 'null';
+        })
+        .map((option: any) => String(option).trim());
+      
+      console.log('Processed dropdown options:', filteredOptions);
+      return filteredOptions;
+    } catch (error) {
+      console.error('Error processing dropdown options:', error);
+      return [];
+    }
+  }, [dropdownOptions]);
+
+  // Sichere Datenextraktion mit Fallbacks
+  const safeData = useMemo(() => {
+    try {
+      if (!entry || typeof entry !== 'object') {
+        console.warn('Invalid entry object');
+        return {
+          category: 'no-category',
+          text: '',
+          hours: 0,
+          minutes: 0,
+          isValid: false
+        };
+      }
+
+      // Sichere Kategorie-Behandlung
+      let category = 'no-category';
+      try {
+        if (entry.category && String(entry.category).trim() !== '') {
+          category = String(entry.category).trim();
+        }
+      } catch (error) {
+        console.warn('Error processing category:', error);
+        category = 'no-category';
+      }
+
+      // Sichere Zahlen-Konvertierung
+      let hours = 0;
+      let minutes = 0;
+      try {
+        hours = Math.max(0, Math.min(23, Number(entry.hours) || 0));
+        minutes = Math.max(0, Math.min(59, Number(entry.minutes) || 0));
+      } catch (error) {
+        console.warn('Error processing time values:', error);
+        hours = 0;
+        minutes = 0;
+      }
+
+      return {
+        category,
+        text: String(entry.text || ''),
+        hours,
+        minutes,
+        isValid: true
+      };
+    } catch (error) {
+      console.error('Error processing entry data:', error);
+      setHasError(true);
+      setErrorMessage('Fehler beim Verarbeiten der Daten');
+      return {
+        category: 'no-category',
+        text: '',
+        hours: 0,
+        minutes: 0,
+        isValid: false
+      };
+    }
+  }, [entry]);
+
+  // Fehlerbehandlung für Update-Funktionen
+  const safeUpdate = (field: string, value: any) => {
+    try {
+      if (!onUpdate || typeof onUpdate !== 'function') {
+        console.error('onUpdate function not available');
+        return;
+      }
+      onUpdate(day, entryId, field, value);
+    } catch (error) {
+      console.error(`Error updating field ${field}:`, error);
+      setHasError(true);
+      setErrorMessage(`Fehler beim Aktualisieren von ${field}`);
+    }
+  };
+
+  const safeConfirm = () => {
+    try {
+      if (!onConfirm || typeof onConfirm !== 'function') {
+        console.error('onConfirm function not available');
+        return;
+      }
+      onConfirm(day, entryId);
+    } catch (error) {
+      console.error('Error confirming entry:', error);
+      setHasError(true);
+      setErrorMessage('Fehler beim Bestätigen des Eintrags');
+    }
+  };
+
+  const safeDelete = () => {
+    try {
+      if (!onDelete || typeof onDelete !== 'function') {
+        console.error('onDelete function not available');
+        return;
+      }
+      onDelete(day, entryId);
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+      setHasError(true);
+      setErrorMessage('Fehler beim Löschen des Eintrags');
+    }
+  };
+
+  const safeEdit = () => {
+    try {
+      if (!onEdit || typeof onEdit !== 'function') {
+        console.error('onEdit function not available');
+        return;
+      }
+      onEdit(day, entryId);
+    } catch (error) {
+      console.error('Error editing entry:', error);
+      setHasError(true);
+      setErrorMessage('Fehler beim Bearbeiten des Eintrags');
+    }
+  };
+
+  // Fehler-UI
+  if (hasError) {
+    return (
+      <div className="border rounded-lg p-3 bg-red-50 border-red-200">
+        <div className="flex items-center gap-2 text-red-600 mb-2">
+          <AlertTriangle className="w-4 h-4" />
+          <span className="text-sm font-medium">Fehler</span>
+        </div>
+        <p className="text-sm text-red-600 mb-2">{errorMessage}</p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setHasError(false);
+            setErrorMessage('');
+          }}
+        >
+          Erneut versuchen
+        </Button>
+      </div>
+    );
+  }
+
+  // Ungültige Daten
+  if (!safeData.isValid) {
+    return (
+      <div className="border rounded-lg p-3 bg-yellow-50 border-yellow-200">
+        <div className="flex items-center gap-2 text-yellow-600">
+          <AlertTriangle className="w-4 h-4" />
+          <span className="text-sm">Ungültige Daten - Eintrag kann nicht angezeigt werden</span>
+        </div>
+      </div>
+    );
+  }
 
   try {
-    // Sichere Kategorie-Behandlung
-    const safeCategory = entry?.category && String(entry.category).trim() !== '' ? String(entry.category) : 'no-category';
-    const safeText = String(entry?.text || '');
-    const safeHours = Math.max(0, Math.min(23, Number(entry?.hours) || 0));
-    const safeMinutes = Math.max(0, Math.min(59, Number(entry?.minutes) || 0));
-
-    if (hasError) {
-      return (
-        <div className="border rounded-lg p-3 bg-red-50 border-red-200">
-          <div className="flex items-center gap-2 text-red-600">
-            <AlertTriangle className="w-4 h-4" />
-            <span className="text-sm">Fehler beim Laden dieses Eintrags</span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setHasError(false)}
-            className="mt-2"
-          >
-            Erneut versuchen
-          </Button>
-        </div>
-      );
-    }
-
     if (entry?.isEditing && !disabled) {
       return (
         <div className="space-y-3">
+          {/* Dauer-Eingabe */}
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium min-w-[60px]">Dauer:</span>
             <div className="flex items-center gap-2">
@@ -214,15 +365,8 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
                 type="number"
                 min="0"
                 max="23"
-                value={safeHours}
-                onChange={(e) => {
-                  try {
-                    onUpdate(day, entryId, 'hours', e.target.value);
-                  } catch (error) {
-                    console.error('Error updating hours:', error);
-                    setHasError(true);
-                  }
-                }}
+                value={safeData.hours}
+                onChange={(e) => safeUpdate('hours', e.target.value)}
                 className="w-20"
                 placeholder="0"
               />
@@ -231,15 +375,8 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
                 type="number"
                 min="0"
                 max="59"
-                value={safeMinutes}
-                onChange={(e) => {
-                  try {
-                    onUpdate(day, entryId, 'minutes', e.target.value);
-                  } catch (error) {
-                    console.error('Error updating minutes:', error);
-                    setHasError(true);
-                  }
-                }}
+                value={safeData.minutes}
+                onChange={(e) => safeUpdate('minutes', e.target.value)}
                 className="w-20"
                 placeholder="0"
               />
@@ -247,19 +384,15 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
             </div>
           </div>
 
-          {dropdownOptions && dropdownOptions.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium min-w-[60px]">Kategorie:</span>
+          {/* Kategorie-Dropdown */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium min-w-[60px]">Kategorie:</span>
+            {safeDropdownOptions.length > 0 ? (
               <Select
-                value={safeCategory}
+                value={safeData.category || 'no-category'}
                 onValueChange={(value) => {
-                  try {
-                    const processedValue = value && String(value).trim() !== '' ? String(value) : 'no-category';
-                    onUpdate(day, entryId, 'category', processedValue);
-                  } catch (error) {
-                    console.error('Error updating category:', error);
-                    setHasError(true);
-                  }
+                  const processedValue = value && String(value).trim() !== '' ? String(value) : 'no-category';
+                  safeUpdate('category', processedValue);
                 }}
               >
                 <SelectTrigger className="flex-1">
@@ -267,48 +400,41 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
                 </SelectTrigger>
                 <SelectContent className="bg-background z-50">
                   <SelectItem value="no-category">Keine Kategorie</SelectItem>
-                  {dropdownOptions
-                    .filter((option: any) => option && String(option).trim() !== '')
-                    .map((option: string, i: number) => (
-                      <SelectItem key={`${option}-${i}`} value={String(option)}>
-                        {String(option)}
-                      </SelectItem>
-                    ))}
+                  {safeDropdownOptions.map((option: string, index: number) => (
+                    <SelectItem 
+                      key={`${option}-${index}`} 
+                      value={option}
+                    >
+                      {option}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-            </div>
-          )}
+            ) : (
+              <div className="flex-1 p-2 border rounded bg-muted text-muted-foreground text-sm">
+                Keine Kategorien verfügbar
+              </div>
+            )}
+          </div>
 
+          {/* Notizen-Textfeld */}
           <div className="flex gap-2">
             <span className="text-sm font-medium min-w-[60px] mt-2">Notizen:</span>
             <Textarea
-              value={safeText}
-              onChange={(e) => {
-                try {
-                  onUpdate(day, entryId, 'text', e.target.value);
-                } catch (error) {
-                  console.error('Error updating text:', error);
-                  setHasError(true);
-                }
-              }}
+              value={safeData.text}
+              onChange={(e) => safeUpdate('text', e.target.value)}
               placeholder="Eintrag für diesen Tag..."
               className="flex-1 min-h-[80px]"
               maxLength={1000}
             />
           </div>
 
+          {/* Aktions-Buttons */}
           <div className="flex justify-end gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                try {
-                  onDelete(day, entryId);
-                } catch (error) {
-                  console.error('Error deleting entry:', error);
-                  setHasError(true);
-                }
-              }}
+              onClick={safeDelete}
               className="text-destructive hover:text-destructive"
             >
               <X className="w-4 h-4 mr-1" />
@@ -317,14 +443,7 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
             <Button
               variant="default"
               size="sm"
-              onClick={() => {
-                try {
-                  onConfirm(day, entryId);
-                } catch (error) {
-                  console.error('Error confirming entry:', error);
-                  setHasError(true);
-                }
-              }}
+              onClick={safeConfirm}
               className="bg-green-600 hover:bg-green-700"
             >
               <Check className="w-4 h-4 mr-1" />
@@ -340,11 +459,11 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <span className="text-sm font-medium">
-                Dauer: {safeHours}h {safeMinutes}min
+                Dauer: {safeData.hours}h {safeData.minutes}min
               </span>
-              {safeCategory && safeCategory !== 'no-category' && (
+              {safeData.category && safeData.category !== 'no-category' && (
                 <span className="text-sm text-muted-foreground">
-                  Kategorie: {safeCategory}
+                  Kategorie: {safeData.category}
                 </span>
               )}
             </div>
@@ -352,14 +471,7 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  try {
-                    onEdit(day, entryId);
-                  } catch (error) {
-                    console.error('Error editing entry:', error);
-                    setHasError(true);
-                  }
-                }}
+                onClick={safeEdit}
               >
                 <Edit className="w-4 h-4 mr-1" />
                 Bearbeiten
@@ -367,9 +479,9 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
             )}
           </div>
           
-          {safeText && (
+          {safeData.text && (
             <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
-              {safeText}
+              {safeData.text}
             </div>
           )}
           
@@ -387,12 +499,12 @@ const SafeEntryRenderer = ({ entry, day, entryId, disabled, onUpdate, onConfirm,
       );
     }
   } catch (error) {
-    console.error('Error rendering entry:', error);
+    console.error('Critical error in SafeEntryRenderer:', error);
     return (
       <div className="border rounded-lg p-3 bg-red-50 border-red-200">
         <div className="flex items-center gap-2 text-red-600">
           <AlertTriangle className="w-4 h-4" />
-          <span className="text-sm">Fehler beim Anzeigen dieses Eintrags</span>
+          <span className="text-sm">Kritischer Fehler beim Anzeigen dieses Eintrags</span>
         </div>
       </div>
     );
@@ -407,28 +519,63 @@ const WeeklySchedulePopupContent = ({
   dropdownOptions = null,
   disabled = false,
 }: WeeklySchedulePopupProps) => {
-  const [weekData, setWeekData] = useState<WeeklyScheduleData>(createDefaultWeekData());
+  const [weekData, setWeekData] = useState<WeeklyScheduleData>(() => ({
+    monday: [],
+    tuesday: [],
+    wednesday: [],
+    thursday: [],
+    friday: [],
+  }));
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const { user } = useAuth();
 
-  const currentUsername = user?.user_metadata?.username || user?.email || 'Unbekannt';
+  const currentUsername = useMemo(() => {
+    try {
+      return user?.user_metadata?.username || user?.email || 'Unbekannt';
+    } catch (error) {
+      console.error('Error getting username:', error);
+      return 'Unbekannt';
+    }
+  }, [user]);
 
+  // Sichere Initialisierung der Daten
   useEffect(() => {
-    if (isOpen) {
-      try {
-        console.log('WeeklySchedulePopup opening with value:', value);
-        const validatedData = validateWeekData(value, currentUsername);
-        console.log('Validated data:', validatedData);
-        setWeekData(validatedData);
+    if (!isOpen) return;
+
+    try {
+      console.log('WeeklySchedulePopup opening with value:', value);
+      
+      if (!value || typeof value !== 'object') {
+        console.log('No valid data provided, using empty week data');
+        setWeekData({
+          monday: [],
+          tuesday: [],
+          wednesday: [],
+          thursday: [],
+          friday: [],
+        });
         setHasError(false);
         setErrorMessage('');
-      } catch (error) {
-        console.error('Error loading week data:', error);
-        setHasError(true);
-        setErrorMessage('Fehler beim Laden der Wochendaten');
-        setWeekData(createDefaultWeekData());
+        return;
       }
+
+      const validatedData = validateWeekData(value, currentUsername);
+      console.log('Validated data:', validatedData);
+      setWeekData(validatedData);
+      setHasError(false);
+      setErrorMessage('');
+    } catch (error) {
+      console.error('Error loading week data:', error);
+      setHasError(true);
+      setErrorMessage('Fehler beim Laden der Wochendaten');
+      setWeekData({
+        monday: [],
+        tuesday: [],
+        wednesday: [],
+        thursday: [],
+        friday: [],
+      });
     }
   }, [value, isOpen, currentUsername]);
 
@@ -570,6 +717,7 @@ const WeeklySchedulePopupContent = ({
     }
   };
 
+  // Sichere Dropdown-Optionen verarbeitung
   const safeDropdownOptions = useMemo(() => {
     try {
       if (!dropdownOptions || !Array.isArray(dropdownOptions)) {
@@ -588,7 +736,7 @@ const WeeklySchedulePopupContent = ({
     return null;
   }
 
-  // Fehler-UI
+  // Fehler-UI für das gesamte Popup
   if (hasError) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -616,7 +764,13 @@ const WeeklySchedulePopupContent = ({
                     setWeekData(validatedData);
                   } catch (error) {
                     console.error('Error resetting data:', error);
-                    setWeekData(createDefaultWeekData());
+                    setWeekData({
+                      monday: [],
+                      tuesday: [],
+                      wednesday: [],
+                      thursday: [],
+                      friday: [],
+                    });
                   }
                 }}
               >
@@ -642,8 +796,14 @@ const WeeklySchedulePopupContent = ({
         </DialogHeader>
         
         <div className="space-y-6">
-          {weekDays.map(({ key, label }) => {
-            const dayEntries = weekData[key] || [];
+          {[
+            { key: 'monday', label: 'Montag' },
+            { key: 'tuesday', label: 'Dienstag' },
+            { key: 'wednesday', label: 'Mittwoch' },
+            { key: 'thursday', label: 'Donnerstag' },
+            { key: 'friday', label: 'Freitag' },
+          ].map(({ key, label }) => {
+            const dayEntries = weekData[key as keyof WeeklyScheduleData] || [];
             
             return (
               <div key={key} className="border rounded-lg p-4 bg-muted/20">
@@ -653,7 +813,7 @@ const WeeklySchedulePopupContent = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => addNewEntry(key)}
+                      onClick={() => addNewEntry(key as keyof WeeklyScheduleData)}
                       className="flex items-center gap-2"
                     >
                       <Plus className="w-4 h-4" />
