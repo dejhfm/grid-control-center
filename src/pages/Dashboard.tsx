@@ -5,6 +5,7 @@ import { TableCard } from "@/components/TableCard";
 import { CreateTableModal } from "@/components/CreateTableModal";
 import { InteractiveTable } from "@/components/InteractiveTable";
 import { PermissionsModal } from "@/components/PermissionsModal";
+import { UserSettingsModal } from "@/components/UserSettingsModal";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,6 +43,7 @@ export const Dashboard = () => {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [permissionsModalTable, setPermissionsModalTable] = useState<string | null>(null);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const handleOpenTable = (tableId: string) => {
     setSelectedTable(tableId);
@@ -85,10 +87,13 @@ export const Dashboard = () => {
 
     return (
       <div className="min-h-screen bg-background">
-        <Header user={{ 
-          name: user?.user_metadata?.full_name || user?.email || 'Benutzer',
-          email: user?.email || '' 
-        }} />
+        <Header 
+          user={{ 
+            name: user?.user_metadata?.full_name || user?.email || 'Benutzer',
+            email: user?.email || '' 
+          }}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
+        />
         <div className="container mx-auto px-4 py-6">
           <div className="mb-6">
             <Button
@@ -107,6 +112,11 @@ export const Dashboard = () => {
             canStructure={userPermission === 'owner'}
           />
         </div>
+        
+        <UserSettingsModal
+          isOpen={isSettingsModalOpen}
+          onClose={() => setIsSettingsModalOpen(false)}
+        />
       </div>
     );
   }
@@ -114,16 +124,24 @@ export const Dashboard = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header user={{ 
-          name: user?.user_metadata?.full_name || user?.email || 'Benutzer',
-          email: user?.email || '' 
-        }} />
+        <Header 
+          user={{ 
+            name: user?.user_metadata?.full_name || user?.email || 'Benutzer',
+            email: user?.email || '' 
+          }}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
+        />
         <div className="container mx-auto px-4 py-6">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
             <p className="mt-4 text-muted-foreground">Lade Tabellen...</p>
           </div>
         </div>
+        
+        <UserSettingsModal
+          isOpen={isSettingsModalOpen}
+          onClose={() => setIsSettingsModalOpen(false)}
+        />
       </div>
     );
   }
@@ -137,6 +155,7 @@ export const Dashboard = () => {
         }}
         onCreateTable={() => setIsCreateModalOpen(true)}
         onLogout={handleLogout}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
       />
       
       <div className="container mx-auto px-4 py-6">
@@ -188,6 +207,11 @@ export const Dashboard = () => {
         isOpen={!!permissionsModalTable}
         onClose={() => setPermissionsModalTable(null)}
         tableId={permissionsModalTable || ''}
+      />
+
+      <UserSettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
       />
     </div>
   );

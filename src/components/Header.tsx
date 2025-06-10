@@ -12,9 +12,10 @@ interface HeaderProps {
   user?: { name: string; email: string };
   onCreateTable?: () => void;
   onLogout?: () => void;
+  onOpenSettings?: () => void;
 }
 
-export const Header = ({ user, onCreateTable, onLogout }: HeaderProps) => {
+export const Header = ({ user, onCreateTable, onLogout, onOpenSettings }: HeaderProps) => {
   return (
     <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
@@ -37,7 +38,10 @@ export const Header = ({ user, onCreateTable, onLogout }: HeaderProps) => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-background">
-                <DropdownMenuItem className="flex items-center space-x-2">
+                <DropdownMenuItem 
+                  onClick={onOpenSettings}
+                  className="flex items-center space-x-2"
+                >
                   <Settings className="w-4 h-4" />
                   <span>Einstellungen</span>
                 </DropdownMenuItem>

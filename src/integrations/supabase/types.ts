@@ -344,8 +344,20 @@ export type Database = {
         }
         Returns: boolean
       }
+      search_users_by_username: {
+        Args: { search_term: string; limit_count?: number }
+        Returns: {
+          user_id: string
+          username: string
+          full_name: string
+        }[]
+      }
       user_exists: {
-        Args: { user_email: string }
+        Args: { user_identifier: string }
+        Returns: boolean
+      }
+      username_exists: {
+        Args: { check_username: string; exclude_user_id?: string }
         Returns: boolean
       }
     }

@@ -1,10 +1,10 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Plus, Shield, AlertTriangle } from 'lucide-react';
+import { Trash2, Plus, Shield, Search } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -16,10 +16,18 @@ interface PermissionsModalProps {
   tableId: string;
 }
 
+interface UserSuggestion {
+  user_id: string;
+  username: string;
+  full_name: string;
+}
+
 export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalProps) => {
-  const [newUserEmail, setNewUserEmail] = useState('');
+  const [searchUsername, setSearchUsername] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUsername, setSelectedUsername] = useState('');
   const [newPermission, setNewPermission] = useState<'viewer' | 'editor'>('viewer');
-  const [isValidating, setIsValidating] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { checkRateLimit } = useRateLimit();
@@ -42,29 +50,28 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
     enabled: isOpen && !!tableId,
   });
 
-  const validateUserEmail = async (email: string): Promise<boolean> => {
-    if (!email.trim()) return false;
-    
-    setIsValidating(true);
-    try {
-      const { data, error } = await supabase.rpc('user_exists', { user_email: email.trim() });
+  const { data: userSuggestions = [] } = useQuery({
+    queryKey: ['user-suggestions', searchUsername],
+    queryFn: async () => {
+      if (!searchUsername.trim() || searchUsername.length < 2) return [];
       
-      if (error) {
-        console.error('User validation error:', error);
-        return false;
-      }
-      
-      return data === true;
-    } catch (error) {
-      console.error('User validation failed:', error);
-      return false;
-    } finally {
-      setIsValidating(false);
-    }
-  };
+      const { data, error } = await supabase.rpc('search_users_by_username', {
+        search_term: searchUsername.trim(),
+        limit_count: 5
+      });
+
+      if (error) throw error;
+      return data as UserSuggestion[];
+    },
+    enabled: searchUsername.length >= 2,
+  });
+
+  useEffect(() => {
+    setShowSuggestions(searchUsername.length >= 2 && userSuggestions.length > 0);
+  }, [searchUsername, userSuggestions]);
 
   const addPermissionMutation = useMutation({
-    mutationFn: async ({ email, permission }: { email: string; permission: 'viewer' | 'editor' }) => {
+    mutationFn: async ({ userId, permission }: { userId: string; permission: 'viewer' | 'editor' }) => {
       // Check rate limiting
       const isRateLimited = await checkRateLimit({
         operationType: 'add_permission',
@@ -76,29 +83,12 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
         throw new Error('Zu viele Berechtigungsänderungen. Bitte warten Sie eine Stunde.');
       }
 
-      // Validate user exists
-      const userExists = await validateUserEmail(email);
-      if (!userExists) {
-        throw new Error('Benutzer nicht gefunden oder ungültige E-Mail');
-      }
-
-      // Get user profile
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', email.trim())
-        .single();
-
-      if (profileError || !profiles) {
-        throw new Error('Benutzer konnte nicht gefunden werden');
-      }
-
       // Check if permission already exists
       const { data: existingPermission } = await supabase
         .from('table_permissions')
         .select('id')
         .eq('table_id', tableId)
-        .eq('user_id', profiles.id)
+        .eq('user_id', userId)
         .single();
 
       if (existingPermission) {
@@ -109,7 +99,7 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
         .from('table_permissions')
         .insert({
           table_id: tableId,
-          user_id: profiles.id,
+          user_id: userId,
           permission,
           granted_by: (await supabase.auth.getUser()).data.user?.id!,
         })
@@ -121,7 +111,10 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['table-permissions', tableId] });
-      setNewUserEmail('');
+      setSearchUsername('');
+      setSelectedUserId(null);
+      setSelectedUsername('');
+      setShowSuggestions(false);
       toast({
         title: 'Berechtigung hinzugefügt',
         description: 'Der Benutzer wurde erfolgreich hinzugefügt.',
@@ -172,28 +165,32 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
     },
   });
 
+  const handleUserSelect = (user: UserSuggestion) => {
+    setSelectedUserId(user.user_id);
+    setSelectedUsername(user.username);
+    setSearchUsername(user.username);
+    setShowSuggestions(false);
+  };
+
   const handleAddPermission = async () => {
-    if (!newUserEmail.trim() || !newPermission) {
+    if (!selectedUserId) {
       toast({
-        title: 'Ungültige Eingabe',
-        description: 'Bitte geben Sie eine gültige E-Mail und Berechtigung an.',
+        title: 'Kein Benutzer ausgewählt',
+        description: 'Bitte wählen Sie einen Benutzer aus der Liste aus.',
         variant: 'destructive',
       });
       return;
     }
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newUserEmail.trim())) {
-      toast({
-        title: 'Ungültige E-Mail',
-        description: 'Bitte geben Sie eine gültige E-Mail-Adresse ein.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    addPermissionMutation.mutate({ userId: selectedUserId, permission: newPermission });
+  };
 
-    addPermissionMutation.mutate({ email: newUserEmail.trim(), permission: newPermission });
+  const handleSearchChange = (value: string) => {
+    setSearchUsername(value);
+    if (value !== selectedUsername) {
+      setSelectedUserId(null);
+      setSelectedUsername('');
+    }
   };
 
   return (
@@ -207,46 +204,71 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
         </DialogHeader>
         
         <div className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="E-Mail oder Benutzername"
-              value={newUserEmail}
-              onChange={(e) => setNewUserEmail(e.target.value)}
-              className="flex-1"
-              disabled={addPermissionMutation.isPending || isValidating}
-            />
-            <Select 
-              value={newPermission} 
-              onValueChange={(value: 'viewer' | 'editor') => setNewPermission(value)}
-              disabled={addPermissionMutation.isPending}
-            >
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-background">
-                <SelectItem value="viewer">Ansicht</SelectItem>
-                <SelectItem value="editor">Bearbeitung</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button 
-              onClick={handleAddPermission} 
-              disabled={addPermissionMutation.isPending || isValidating || !newUserEmail.trim()}
-              size="sm"
-            >
-              {addPermissionMutation.isPending || isValidating ? (
-                <div className="w-4 h-4 animate-spin rounded-full border-2 border-background border-t-foreground" />
-              ) : (
-                <Plus className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
+          <div className="space-y-2">
+            <div className="relative">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="Benutzername suchen..."
+                    value={searchUsername}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="pr-10"
+                    disabled={addPermissionMutation.isPending}
+                  />
+                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                </div>
+                <Select 
+                  value={newPermission} 
+                  onValueChange={(value: 'viewer' | 'editor') => setNewPermission(value)}
+                  disabled={addPermissionMutation.isPending}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background">
+                    <SelectItem value="viewer">Ansicht</SelectItem>
+                    <SelectItem value="editor">Bearbeitung</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  onClick={handleAddPermission} 
+                  disabled={addPermissionMutation.isPending || !selectedUserId}
+                  size="sm"
+                >
+                  {addPermissionMutation.isPending ? (
+                    <div className="w-4 h-4 animate-spin rounded-full border-2 border-background border-t-foreground" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
 
-          {newUserEmail.trim() && !isValidating && (
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" />
-              <span>Benutzer wird beim Hinzufügen validiert</span>
+              {showSuggestions && (
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                  {userSuggestions.map((user) => (
+                    <button
+                      key={user.user_id}
+                      onClick={() => handleUserSelect(user)}
+                      className="w-full px-3 py-2 text-left hover:bg-muted flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="font-medium">{user.username}</div>
+                        {user.full_name && (
+                          <div className="text-sm text-muted-foreground">{user.full_name}</div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+
+            {selectedUserId && (
+              <div className="text-sm text-green-600 flex items-center gap-1">
+                <span>✓ Benutzer "{selectedUsername}" ausgewählt</span>
+              </div>
+            )}
+          </div>
 
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {permissions.length === 0 ? (
@@ -258,11 +280,14 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
                 <div key={permission.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex-1">
                     <span className="font-medium block">
-                      {permission.user_profile.full_name || permission.user_profile.username}
+                      {permission.user_profile.username}
                     </span>
-                    <span className="text-sm text-muted-foreground">
+                    <div className="text-sm text-muted-foreground">
                       {permission.permission === 'viewer' ? 'Ansicht' : 'Bearbeitung'}
-                    </span>
+                      {permission.user_profile.full_name && (
+                        <span> • {permission.user_profile.full_name}</span>
+                      )}
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
