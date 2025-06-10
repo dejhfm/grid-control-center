@@ -17,7 +17,7 @@ import { useUpdateColumn } from '@/hooks/useTableData';
 import { useToast } from '@/hooks/use-toast';
 import { getCurrentYear } from '@/utils/calendarWeeks';
 
-type ColumnType = 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks' | 'weekly_schedule';
+type ColumnType = 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks' | 'weekly_schedule' | 'user_dropdown';
 
 interface ColumnConfigModalProps {
   isOpen: boolean;
@@ -77,7 +77,7 @@ export const ColumnConfigModal = ({
       try {
         setColumnType(column.column_type as ColumnType);
         
-        if (column.column_type === 'select' || column.column_type === 'weekly_schedule') {
+        if (column.column_type === 'select' || column.column_type === 'weekly_schedule' || column.column_type === 'user_dropdown') {
           const extractedOptions = safeExtractOptions(column.options);
           console.log('Loading options for', column.column_type, ':', extractedOptions);
           setOptions(extractedOptions);
@@ -140,7 +140,7 @@ export const ColumnConfigModal = ({
     try {
       let finalOptions: any = null;
 
-      if (columnType === 'select' || columnType === 'weekly_schedule') {
+      if (columnType === 'select' || columnType === 'weekly_schedule' || columnType === 'user_dropdown') {
         // Nur nicht-leere Optionen speichern
         const validOptions = options.filter(opt => opt.trim().length > 0);
         finalOptions = validOptions.length > 0 ? validOptions : null;
@@ -178,7 +178,7 @@ export const ColumnConfigModal = ({
       setColumnType(newType);
       
       // Reset nur wenn Typ wechselt
-      if (newType !== 'select' && newType !== 'weekly_schedule') {
+      if (newType !== 'select' && newType !== 'weekly_schedule' && newType !== 'user_dropdown') {
         setOptions([]);
       }
       if (newType !== 'calendar_weeks') {
@@ -213,6 +213,7 @@ export const ColumnConfigModal = ({
                 <SelectItem value="pdf_upload">PDF Upload</SelectItem>
                 <SelectItem value="calendar_weeks">Kalenderwochen</SelectItem>
                 <SelectItem value="weekly_schedule">Wochenplan-Eingabe</SelectItem>
+                <SelectItem value="user_dropdown">User-Dropdown</SelectItem>
               </SelectContent>
             </Select>
           </div>
