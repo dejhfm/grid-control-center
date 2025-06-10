@@ -53,7 +53,6 @@ const weekDays = [
   { key: 'friday', label: 'Freitag' },
 ] as const;
 
-// Helper function to safely validate and fix day entry data
 const validateDayEntry = (entry: any): DayEntry => {
   try {
     if (!entry || typeof entry !== 'object') {
@@ -73,7 +72,6 @@ const validateDayEntry = (entry: any): DayEntry => {
   }
 };
 
-// Helper function to safely validate and fix week data
 const validateWeekData = (data: any): WeeklyScheduleData => {
   try {
     if (!data || typeof data !== 'object') {
@@ -130,12 +128,10 @@ export const WeeklySchedulePopup = ({
       console.log('Updating day entry:', { day, field, newValue });
       
       setWeekData(prev => {
-        // Ensure the day exists and is valid
         const currentDay = prev[day] || createDefaultDayEntry();
         
         let processedValue = newValue;
         
-        // Type-safe value processing
         if (field === 'hours' || field === 'minutes') {
           processedValue = typeof newValue === 'number' && !isNaN(newValue) ? newValue : 0;
         } else {
@@ -176,7 +172,6 @@ export const WeeklySchedulePopup = ({
     }
   };
 
-  // Safely process dropdown options
   const safeDropdownOptions = React.useMemo(() => {
     try {
       if (Array.isArray(dropdownOptions)) {
@@ -204,7 +199,6 @@ export const WeeklySchedulePopup = ({
         
         <div className="space-y-6">
           {weekDays.map(({ key, label }) => {
-            // Safely get day data with fallback
             const dayData = weekData[key] || createDefaultDayEntry();
             
             return (
@@ -212,7 +206,6 @@ export const WeeklySchedulePopup = ({
                 <h3 className="font-medium mb-3 text-sm">{label}</h3>
                 
                 <div className="grid grid-cols-1 gap-4">
-                  {/* Duration Input */}
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium min-w-[60px]">Dauer:</span>
                     <div className="flex items-center gap-2">
@@ -239,7 +232,6 @@ export const WeeklySchedulePopup = ({
                     </div>
                   </div>
 
-                  {/* Category Dropdown */}
                   {hasDropdownOptions && (
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium min-w-[60px]">Kategorie:</span>
@@ -251,6 +243,7 @@ export const WeeklySchedulePopup = ({
                           <SelectValue placeholder="Kategorie auswählen..." />
                         </SelectTrigger>
                         <SelectContent className="bg-background">
+                          <SelectItem value="">Keine Kategorie</SelectItem>
                           {safeDropdownOptions.map((option, i) => (
                             <SelectItem key={`${option}-${i}`} value={option}>
                               {option}
@@ -261,7 +254,6 @@ export const WeeklySchedulePopup = ({
                     </div>
                   )}
 
-                  {/* Text Area */}
                   <div className="flex gap-2">
                     <span className="text-sm font-medium min-w-[60px] mt-2">Notizen:</span>
                     <Textarea

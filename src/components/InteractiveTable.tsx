@@ -134,7 +134,7 @@ export const InteractiveTable = ({
               canStructure={canStructure}
               onConfigColumn={setConfigColumn}
             />
-            <tbody>
+            <tbody className="group">
               {data.map((row, rowIndex) => (
                 <TableRow
                   key={rowIndex}
