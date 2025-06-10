@@ -83,7 +83,11 @@ export const InteractiveTable = ({
     
     const newData = data.map(row => [
       ...row,
-      { value: '', type: 'text' }
+      { 
+        value: '', 
+        type: 'text' as CellType,
+        options: undefined
+      }
     ]);
     setData(newData);
   };
