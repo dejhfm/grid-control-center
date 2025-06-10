@@ -69,16 +69,25 @@ export const UserDropdownCell = ({
     );
   }
 
+  const handleValueChange = (newValue: string) => {
+    // Convert the special "no-user" value back to empty string for the actual data
+    if (newValue === 'no-user-selected') {
+      onCellUpdate('');
+    } else {
+      onCellUpdate(newValue);
+    }
+  };
+
   return (
     <Select 
-      value={value || ''} 
-      onValueChange={onCellUpdate}
+      value={value || 'no-user-selected'} 
+      onValueChange={handleValueChange}
     >
       <SelectTrigger className="w-full">
         <SelectValue placeholder="Benutzer auswählen..." />
       </SelectTrigger>
       <SelectContent className="bg-background">
-        <SelectItem value="">Kein Benutzer</SelectItem>
+        <SelectItem value="no-user-selected">Kein Benutzer</SelectItem>
         {users.map((user) => (
           <SelectItem key={user.id} value={user.username}>
             {user.username} {user.full_name && `(${user.full_name})`}
