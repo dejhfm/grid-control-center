@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,15 +42,15 @@ export const InteractiveTable = ({
   const [data, setData] = useState<CellData[][]>([]);
 
   useEffect(() => {
-    if (columns.length && tableData.length >= 0) {
+    if (columns.length > 0) {
       // Get the maximum row index to determine how many rows we have
-      const maxRowIndex = Math.max(...tableData.map(d => d.row_index), -1);
-      const numRows = maxRowIndex + 1;
+      const maxRowIndex = tableData.length > 0 ? Math.max(...tableData.map(d => d.row_index)) : -1;
+      const numRows = Math.max(maxRowIndex + 1, 5); // Ensure at least 5 rows
 
       // Create a 2D array for the table data
       const transformedData: CellData[][] = [];
       
-      for (let rowIndex = 0; rowIndex < Math.max(numRows, 5); rowIndex++) {
+      for (let rowIndex = 0; rowIndex < numRows; rowIndex++) {
         const row: CellData[] = [];
         
         for (let colIndex = 0; colIndex < columns.length; colIndex++) {
@@ -60,8 +59,15 @@ export const InteractiveTable = ({
             d => d.row_index === rowIndex && d.column_id === column.id
           );
           
+          let cellValue;
+          if (column.column_type === 'checkbox') {
+            cellValue = cellData?.value === true || cellData?.value === 'true';
+          } else {
+            cellValue = cellData?.value || '';
+          }
+          
           row.push({
-            value: cellData?.value || (column.column_type === 'checkbox' ? false : ''),
+            value: cellValue,
             type: column.column_type as CellType,
             options: column.options as string[] | undefined,
           });
@@ -75,40 +81,52 @@ export const InteractiveTable = ({
   }, [columns, tableData]);
 
   const updateCellValue = useCallback(async (rowIndex: number, colIndex: number, value: any) => {
+    const column = columns[colIndex];
+    if (!column) return;
+
     // Update local state immediately for better UX
     setData(prevData => {
       const newData = [...prevData];
       if (newData[rowIndex] && newData[rowIndex][colIndex]) {
-        newData[rowIndex][colIndex] = { ...newData[rowIndex][colIndex], value };
+        newData[rowIndex][colIndex] = { 
+          ...newData[rowIndex][colIndex], 
+          value 
+        };
       }
       return newData;
     });
 
     // Update in database
-    const column = columns[colIndex];
-    if (column) {
-      try {
-        await updateCellMutation.mutateAsync({
-          tableId,
-          rowIndex,
-          columnId: column.id,
-          value,
-        });
-      } catch (error) {
-        console.error('Error updating cell:', error);
-        // Revert local state on error
-        setData(prevData => {
-          const revertedData = [...prevData];
-          const originalValue = tableData.find(d => d.row_index === rowIndex && d.column_id === column.id)?.value;
-          if (revertedData[rowIndex] && revertedData[rowIndex][colIndex]) {
-            revertedData[rowIndex][colIndex] = { 
-              ...revertedData[rowIndex][colIndex], 
-              value: originalValue || ''
-            };
-          }
-          return revertedData;
-        });
-      }
+    try {
+      await updateCellMutation.mutateAsync({
+        tableId,
+        rowIndex,
+        columnId: column.id,
+        value,
+      });
+      console.log('Cell updated successfully:', { rowIndex, colIndex, value });
+    } catch (error) {
+      console.error('Error updating cell:', error);
+      // Revert local state on error
+      setData(prevData => {
+        const revertedData = [...prevData];
+        const originalCellData = tableData.find(d => d.row_index === rowIndex && d.column_id === column.id);
+        let originalValue;
+        
+        if (column.column_type === 'checkbox') {
+          originalValue = originalCellData?.value === true || originalCellData?.value === 'true';
+        } else {
+          originalValue = originalCellData?.value || '';
+        }
+        
+        if (revertedData[rowIndex] && revertedData[rowIndex][colIndex]) {
+          revertedData[rowIndex][colIndex] = { 
+            ...revertedData[rowIndex][colIndex], 
+            value: originalValue
+          };
+        }
+        return revertedData;
+      });
     }
   }, [columns, tableData, tableId, updateCellMutation]);
 
@@ -122,10 +140,12 @@ export const InteractiveTable = ({
   };
 
   const renderCell = (cell: CellData, rowIndex: number, colIndex: number) => {
+    const cellKey = `${rowIndex}-${colIndex}`;
+    
     if (mode === 'view') {
       switch (cell.type) {
         case 'checkbox':
-          return <Checkbox checked={cell.value} disabled />;
+          return <Checkbox checked={Boolean(cell.value)} disabled />;
         case 'select':
           return <span className="text-sm">{cell.value || '-'}</span>;
         default:
@@ -137,13 +157,24 @@ export const InteractiveTable = ({
       case 'checkbox':
         return (
           <Checkbox
-            checked={cell.value}
-            onCheckedChange={(checked) => updateCellValue(rowIndex, colIndex, checked)}
+            key={cellKey}
+            checked={Boolean(cell.value)}
+            onCheckedChange={(checked) => {
+              console.log('Checkbox changed:', { rowIndex, colIndex, checked });
+              updateCellValue(rowIndex, colIndex, checked);
+            }}
           />
         );
       case 'select':
         return (
-          <Select value={cell.value || ''} onValueChange={(value) => updateCellValue(rowIndex, colIndex, value)}>
+          <Select 
+            key={cellKey}
+            value={String(cell.value || '')} 
+            onValueChange={(value) => {
+              console.log('Select changed:', { rowIndex, colIndex, value });
+              updateCellValue(rowIndex, colIndex, value);
+            }}
+          >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Auswählen..." />
             </SelectTrigger>
@@ -157,9 +188,14 @@ export const InteractiveTable = ({
       default:
         return (
           <Input
-            value={cell.value || ''}
-            onChange={(e) => updateCellValue(rowIndex, colIndex, e.target.value)}
+            key={cellKey}
+            value={String(cell.value || '')}
+            onChange={(e) => {
+              console.log('Input changed:', { rowIndex, colIndex, value: e.target.value });
+              updateCellValue(rowIndex, colIndex, e.target.value);
+            }}
             className="w-full"
+            placeholder="Text eingeben..."
           />
         );
     }
@@ -260,7 +296,7 @@ export const InteractiveTable = ({
               {data.map((row, rowIndex) => (
                 <tr key={rowIndex} className="border-t hover:bg-muted/50">
                   {row.map((cell, colIndex) => (
-                    <td key={colIndex} className="p-3">
+                    <td key={`${rowIndex}-${colIndex}`} className="p-3">
                       {renderCell(cell, rowIndex, colIndex)}
                     </td>
                   ))}
