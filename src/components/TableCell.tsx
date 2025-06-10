@@ -1,9 +1,11 @@
 
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CellData, TableMode } from "@/hooks/useTableState";
 import { PdfUploadCellSecure } from "@/components/PdfUploadCellSecure";
+import { useState, useEffect } from "react";
 
 interface TableCellProps {
   cell: CellData;
@@ -22,9 +24,35 @@ export const TableCell = ({
   tableId,
   onCellUpdate 
 }: TableCellProps) => {
+  // Local state for text inputs to prevent interruption during typing
+  const [localValue, setLocalValue] = useState(String(cell.value || ''));
+
+  // Update local value when cell value changes from external source
+  useEffect(() => {
+    setLocalValue(String(cell.value || ''));
+  }, [cell.value]);
+
   // Sanitize input to prevent XSS
   const sanitizeInput = (value: string): string => {
     return value.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  };
+
+  const handleTextBlur = () => {
+    const sanitizedValue = sanitizeInput(localValue);
+    // Only update if value actually changed
+    if (sanitizedValue !== String(cell.value || '')) {
+      console.log('Text field blur - saving:', { rowIndex, colIndex, value: sanitizedValue });
+      onCellUpdate(rowIndex, colIndex, sanitizedValue);
+    }
+  };
+
+  const handleTextKeyDown = (e: React.KeyboardEvent) => {
+    // Save on Enter key
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleTextBlur();
+      (e.target as HTMLInputElement).blur();
+    }
   };
   
   if (mode === 'view') {
@@ -45,7 +73,16 @@ export const TableCell = ({
           />
         );
       default:
-        return <span className="text-sm">{String(cell.value || '-')}</span>;
+        const displayValue = String(cell.value || '-');
+        // Show as textarea for longer text, single line for shorter text
+        if (displayValue.length > 50 || displayValue.includes('\n')) {
+          return (
+            <div className="text-sm whitespace-pre-wrap max-w-xs overflow-hidden">
+              {displayValue}
+            </div>
+          );
+        }
+        return <span className="text-sm">{displayValue}</span>;
     }
   }
 
@@ -91,14 +128,29 @@ export const TableCell = ({
         />
       );
     default:
+      // Use textarea for longer text or multiline content
+      const shouldUseTextarea = localValue.length > 50 || localValue.includes('\n');
+      
+      if (shouldUseTextarea) {
+        return (
+          <Textarea
+            value={localValue}
+            onChange={(e) => setLocalValue(e.target.value)}
+            onBlur={handleTextBlur}
+            onKeyDown={handleTextKeyDown}
+            className="w-full min-h-[80px] resize-vertical"
+            placeholder="Text eingeben..."
+            maxLength={5000} // Increased limit for longer text
+          />
+        );
+      }
+      
       return (
         <Input
-          value={String(cell.value || '')}
-          onChange={(e) => {
-            const sanitizedValue = sanitizeInput(e.target.value);
-            console.log('Input changed:', { rowIndex, colIndex, value: sanitizedValue });
-            onCellUpdate(rowIndex, colIndex, sanitizedValue);
-          }}
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={handleTextBlur}
+          onKeyDown={handleTextKeyDown}
           className="w-full"
           placeholder="Text eingeben..."
           maxLength={1000} // Limit input length for security
