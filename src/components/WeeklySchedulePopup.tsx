@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Save, X } from 'lucide-react';
+import { ErrorBoundary } from './ErrorBoundary';
 
 interface DayEntry {
   text: string;
@@ -59,10 +60,10 @@ const validateDayEntry = (entry: any): DayEntry => {
   }
 
   return {
-    text: typeof entry.text === 'string' ? entry.text : '',
-    category: typeof entry.category === 'string' ? entry.category : '',
-    hours: typeof entry.hours === 'number' && !isNaN(entry.hours) ? entry.hours : 0,
-    minutes: typeof entry.minutes === 'number' && !isNaN(entry.minutes) ? entry.minutes : 0,
+    text: String(entry.text || ''),
+    category: String(entry.category || ''),
+    hours: Number(entry.hours) || 0,
+    minutes: Number(entry.minutes) || 0,
   };
 };
 
@@ -71,16 +72,18 @@ const validateWeekData = (data: any): WeeklyScheduleData => {
     return createDefaultWeekData();
   }
 
-  return {
-    monday: validateDayEntry(data.monday),
-    tuesday: validateDayEntry(data.tuesday),
-    wednesday: validateDayEntry(data.wednesday),
-    thursday: validateDayEntry(data.thursday),
-    friday: validateDayEntry(data.friday),
-  };
+  const result = createDefaultWeekData();
+  
+  weekDays.forEach(({ key }) => {
+    if (data[key]) {
+      result[key] = validateDayEntry(data[key]);
+    }
+  });
+
+  return result;
 };
 
-export const WeeklySchedulePopup = ({
+const WeeklySchedulePopupContent = ({
   isOpen,
   onClose,
   value,
@@ -91,73 +94,63 @@ export const WeeklySchedulePopup = ({
 
   useEffect(() => {
     if (isOpen) {
-      try {
-        if (value) {
-          const validatedData = validateWeekData(value);
-          setWeekData(validatedData);
-        } else {
-          setWeekData(createDefaultWeekData());
-        }
-      } catch (error) {
-        console.error('Error in WeeklySchedulePopup useEffect:', error);
-        setWeekData(createDefaultWeekData());
-      }
+      console.log('WeeklySchedulePopup opening with value:', value);
+      const validatedData = validateWeekData(value);
+      console.log('Validated data:', validatedData);
+      setWeekData(validatedData);
     }
   }, [value, isOpen]);
 
   const updateDayEntry = (day: keyof WeeklyScheduleData, field: keyof DayEntry, newValue: any) => {
-    try {
-      setWeekData(prev => {
-        const currentDay = prev[day] || createDefaultDayEntry();
-        
-        let processedValue = newValue;
-        
-        if (field === 'hours' || field === 'minutes') {
-          processedValue = typeof newValue === 'number' && !isNaN(newValue) ? newValue : 0;
+    console.log('Updating day entry:', { day, field, newValue });
+    
+    setWeekData(prev => {
+      const currentDay = prev[day] || createDefaultDayEntry();
+      
+      let processedValue = newValue;
+      
+      if (field === 'hours' || field === 'minutes') {
+        processedValue = Number(newValue) || 0;
+        // Begrenze Werte
+        if (field === 'hours') {
+          processedValue = Math.max(0, Math.min(23, processedValue));
         } else {
-          processedValue = typeof newValue === 'string' ? newValue : '';
+          processedValue = Math.max(0, Math.min(59, processedValue));
         }
+      } else {
+        processedValue = String(newValue || '');
+      }
 
-        return {
-          ...prev,
-          [day]: {
-            ...currentDay,
-            [field]: processedValue,
-          },
-        };
-      });
-    } catch (error) {
-      console.error('Error updating day entry:', error);
-    }
+      const newDayData = {
+        ...currentDay,
+        [field]: processedValue,
+      };
+
+      return {
+        ...prev,
+        [day]: newDayData,
+      };
+    });
   };
 
   const handleSave = () => {
-    try {
-      onSave(weekData);
-      onClose();
-    } catch (error) {
-      console.error('Error saving week data:', error);
-    }
+    console.log('Saving week data:', weekData);
+    onSave(weekData);
+    onClose();
   };
 
   const handleClose = () => {
-    try {
-      onClose();
-    } catch (error) {
-      console.error('Error closing popup:', error);
-    }
+    console.log('Closing popup');
+    onClose();
   };
 
   const safeDropdownOptions = useMemo(() => {
-    try {
-      if (Array.isArray(dropdownOptions)) {
-        return dropdownOptions.filter(option => typeof option === 'string' && option.trim().length > 0);
-      }
-      return [];
-    } catch (error) {
-      console.error('Error processing dropdown options:', error);
+    if (!dropdownOptions || !Array.isArray(dropdownOptions)) {
       return [];
     }
+    return dropdownOptions.filter(option => 
+      typeof option === 'string' && option.trim().length > 0
+    );
   }, [dropdownOptions]);
 
   const hasDropdownOptions = safeDropdownOptions.length > 0;
@@ -189,8 +182,8 @@ export const WeeklySchedulePopup = ({
                         type="number"
                         min="0"
                         max="23"
-                        value={dayData.hours || 0}
-                        onChange={(e) => updateDayEntry(key, 'hours', parseInt(e.target.value) || 0)}
+                        value={dayData.hours}
+                        onChange={(e) => updateDayEntry(key, 'hours', e.target.value)}
                         className="w-20"
                         placeholder="0"
                       />
@@ -199,8 +192,8 @@ export const WeeklySchedulePopup = ({
                         type="number"
                         min="0"
                         max="59"
-                        value={dayData.minutes || 0}
-                        onChange={(e) => updateDayEntry(key, 'minutes', parseInt(e.target.value) || 0)}
+                        value={dayData.minutes}
+                        onChange={(e) => updateDayEntry(key, 'minutes', e.target.value)}
                         className="w-20"
                         placeholder="0"
                       />
@@ -212,13 +205,13 @@ export const WeeklySchedulePopup = ({
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium min-w-[60px]">Kategorie:</span>
                       <Select
-                        value={dayData.category || ''}
+                        value={dayData.category}
                         onValueChange={(value) => updateDayEntry(key, 'category', value)}
                       >
                         <SelectTrigger className="flex-1">
                           <SelectValue placeholder="Kategorie auswählen..." />
                         </SelectTrigger>
-                        <SelectContent className="bg-background">
+                        <SelectContent className="bg-background z-50">
                           <SelectItem value="">Keine Kategorie</SelectItem>
                           {safeDropdownOptions.map((option, i) => (
                             <SelectItem key={`${option}-${i}`} value={option}>
@@ -233,7 +226,7 @@ export const WeeklySchedulePopup = ({
                   <div className="flex gap-2">
                     <span className="text-sm font-medium min-w-[60px] mt-2">Notizen:</span>
                     <Textarea
-                      value={dayData.text || ''}
+                      value={dayData.text}
                       onChange={(e) => updateDayEntry(key, 'text', e.target.value)}
                       placeholder="Eintrag für diesen Tag..."
                       className="flex-1 min-h-[80px]"
@@ -258,5 +251,13 @@ export const WeeklySchedulePopup = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+};
+
+export const WeeklySchedulePopup = (props: WeeklySchedulePopupProps) => {
+  return (
+    <ErrorBoundary componentName="WeeklySchedulePopup">
+      <WeeklySchedulePopupContent {...props} />
+    </ErrorBoundary>
   );
 };

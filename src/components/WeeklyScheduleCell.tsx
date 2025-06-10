@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from 'lucide-react';
 import { WeeklySchedulePopup } from './WeeklySchedulePopup';
+import { ErrorBoundary } from './ErrorBoundary';
 
 interface WeeklyScheduleData {
   monday: { text: string; category: string; hours: number; minutes: number };
@@ -19,7 +20,7 @@ interface WeeklyScheduleCellProps {
   disabled?: boolean;
 }
 
-export const WeeklyScheduleCell = ({
+const WeeklyScheduleCellContent = ({
   value,
   onChange,
   dropdownOptions = null,
@@ -31,21 +32,16 @@ export const WeeklyScheduleCell = ({
     if (!data) return '0:00';
     
     let totalMinutes = 0;
-    try {
-      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
-      
-      days.forEach(dayKey => {
-        const day = data[dayKey];
-        if (day && typeof day === 'object') {
-          const hours = typeof day.hours === 'number' && !isNaN(day.hours) ? day.hours : 0;
-          const minutes = typeof day.minutes === 'number' && !isNaN(day.minutes) ? day.minutes : 0;
-          totalMinutes += (hours * 60) + minutes;
-        }
-      });
-    } catch (error) {
-      console.error('Error calculating total hours:', error);
-      return '0:00';
-    }
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
+    
+    days.forEach(dayKey => {
+      const day = data[dayKey];
+      if (day && typeof day === 'object') {
+        const hours = Number(day.hours) || 0;
+        const minutes = Number(day.minutes) || 0;
+        totalMinutes += (hours * 60) + minutes;
+      }
+    });
     
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
@@ -53,67 +49,51 @@ export const WeeklyScheduleCell = ({
   };
 
   const hasData = useMemo(() => {
-    try {
-      if (!value || typeof value !== 'object') {
-        return false;
-      }
-
-      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
-      
-      return days.some(dayKey => {
-        const day = value[dayKey];
-        if (!day || typeof day !== 'object') {
-          return false;
-        }
-        
-        return (
-          (typeof day.text === 'string' && day.text.trim().length > 0) ||
-          (typeof day.category === 'string' && day.category.trim().length > 0) ||
-          (typeof day.hours === 'number' && day.hours > 0) ||
-          (typeof day.minutes === 'number' && day.minutes > 0)
-        );
-      });
-    } catch (error) {
-      console.error('Error checking if data exists:', error);
+    if (!value || typeof value !== 'object') {
       return false;
     }
+
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
+    
+    return days.some(dayKey => {
+      const day = value[dayKey];
+      if (!day || typeof day !== 'object') {
+        return false;
+      }
+      
+      return (
+        (day.text && day.text.trim().length > 0) ||
+        (day.category && day.category.trim().length > 0) ||
+        (Number(day.hours) > 0) ||
+        (Number(day.minutes) > 0)
+      );
+    });
   }, [value]);
 
   const handleOpenPopup = () => {
     if (!disabled) {
+      console.log('Opening WeeklySchedule popup with value:', value);
       setIsPopupOpen(true);
     }
   };
 
   const handleSave = (data: WeeklyScheduleData) => {
-    try {
-      onChange(data);
-    } catch (error) {
-      console.error('Error in WeeklyScheduleCell handleSave:', error);
-    }
+    console.log('Saving WeeklySchedule data:', data);
+    onChange(data);
   };
 
   const handleClose = () => {
-    try {
-      setIsPopupOpen(false);
-    } catch (error) {
-      console.error('Error closing WeeklySchedule popup:', error);
-    }
+    console.log('Closing WeeklySchedule popup');
+    setIsPopupOpen(false);
   };
 
-  // Sichere Verarbeitung der dropdownOptions
   const safeDropdownOptions = useMemo(() => {
-    try {
-      if (Array.isArray(dropdownOptions)) {
-        return dropdownOptions.filter(option => 
-          typeof option === 'string' && option.trim().length > 0
-        );
-      }
-      return [];
-    } catch (error) {
-      console.error('Error processing dropdown options:', error);
+    if (!dropdownOptions || !Array.isArray(dropdownOptions)) {
       return [];
     }
+    return dropdownOptions.filter(option => 
+      typeof option === 'string' && option.trim().length > 0
+    );
   }, [dropdownOptions]);
 
   return (
@@ -139,5 +119,13 @@ export const WeeklyScheduleCell = ({
         />
       )}
     </>
+  );
+};
+
+export const WeeklyScheduleCell = (props: WeeklyScheduleCellProps) => {
+  return (
+    <ErrorBoundary componentName="WeeklyScheduleCell">
+      <WeeklyScheduleCellContent {...props} />
+    </ErrorBoundary>
   );
 };

@@ -58,18 +58,13 @@ export const TableCell = ({
   
   // Sichere Extraktion der dropdown options
   const getSafeDropdownOptions = (options: any): string[] => {
-    try {
-      if (Array.isArray(options)) {
-        return options
-          .filter(opt => opt != null && typeof opt === 'string')
-          .map(opt => opt.trim())
-          .filter(opt => opt.length > 0);
-      }
-      return [];
-    } catch (error) {
-      console.error('Error processing dropdown options:', error);
+    if (!options || !Array.isArray(options)) {
       return [];
     }
+    return options
+      .filter(opt => opt != null && typeof opt === 'string')
+      .map(opt => opt.trim())
+      .filter(opt => opt.length > 0);
   };
   
   if (mode === 'view') {
@@ -99,7 +94,9 @@ export const TableCell = ({
         return (
           <WeeklyScheduleCell
             value={cell.value}
-            onChange={(value) => onCellUpdate(rowIndex, colIndex, value)}
+            onChange={(value) => {
+              console.log('Weekly schedule view mode change (should not happen):', value);
+            }}
             dropdownOptions={getSafeDropdownOptions(cell.options)}
             disabled={true}
           />
@@ -188,7 +185,7 @@ export const TableCell = ({
         <WeeklyScheduleCell
           value={cell.value}
           onChange={(value) => {
-            console.log('Weekly schedule changed:', { rowIndex, colIndex, value });
+            console.log('Weekly schedule edit mode change:', { rowIndex, colIndex, value });
             onCellUpdate(rowIndex, colIndex, value);
           }}
           dropdownOptions={getSafeDropdownOptions(cell.options)}
