@@ -120,7 +120,7 @@ export const useUpdateColumn = () => {
       options,
     }: {
       columnId: string;
-      columnType: 'text' | 'checkbox' | 'select';
+      columnType: 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks';
       options?: string[];
     }) => {
       const { data, error } = await supabase

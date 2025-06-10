@@ -1,12 +1,13 @@
 
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, Trash2, Download, AlertTriangle } from 'lucide-react';
+import { Upload, FileText, Trash2, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { validateFile, sanitizeFileName } from '@/utils/fileValidation';
 import { useRateLimit } from '@/hooks/useRateLimit';
+import { useFileAudit } from '@/hooks/useFileAudit';
 
 interface PdfUploadCellSecureProps {
   value: string | null;
@@ -31,6 +32,7 @@ export const PdfUploadCellSecure = ({
   const { toast } = useToast();
   const { user } = useAuth();
   const { checkRateLimit } = useRateLimit();
+  const fileAuditMutation = useFileAudit();
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -89,6 +91,19 @@ export const PdfUploadCellSecure = ({
       // Update cell value with secure file path
       onCellUpdate(rowIndex, colIndex, data.path);
 
+      // Log file audit
+      fileAuditMutation.mutate({
+        tableId,
+        filePath: data.path,
+        action: 'upload',
+        metadata: { 
+          fileName: sanitizedFileName, 
+          fileSize: file.size,
+          rowIndex,
+          colIndex 
+        }
+      });
+
       toast({
         title: 'Upload erfolgreich',
         description: 'Die PDF-Datei wurde sicher hochgeladen.',
@@ -128,6 +143,14 @@ export const PdfUploadCellSecure = ({
       // Update cell value
       onCellUpdate(rowIndex, colIndex, null);
 
+      // Log file audit
+      fileAuditMutation.mutate({
+        tableId,
+        filePath: value,
+        action: 'delete',
+        metadata: { rowIndex, colIndex }
+      });
+
       toast({
         title: 'Datei gelöscht',
         description: 'Die PDF-Datei wurde erfolgreich entfernt.',
@@ -166,6 +189,14 @@ export const PdfUploadCellSecure = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+
+      // Log file audit
+      fileAuditMutation.mutate({
+        tableId,
+        filePath: value,
+        action: 'download',
+        metadata: { rowIndex, colIndex }
+      });
 
     } catch (error: any) {
       console.error('Download error:', error);

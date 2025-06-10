@@ -9,6 +9,51 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      file_audit: {
+        Row: {
+          action: string
+          created_at: string
+          file_path: string
+          id: string
+          metadata: Json | null
+          table_id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          file_path: string
+          id?: string
+          metadata?: Json | null
+          table_id: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          file_path?: string
+          id?: string
+          metadata?: Json | null
+          table_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_audit_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_audit_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permission_audit: {
         Row: {
           action: string
