@@ -20,9 +20,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Get initial session
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      setLoading(false);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+      } catch (error) {
+        console.error('Error getting session:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     getSession();
@@ -30,6 +35,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
         setUser(session?.user ?? null);
         setLoading(false);
       }
@@ -60,8 +66,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    try {
+      console.log('Attempting to sign out...');
+      const { error } = await supabase.auth.signOut();
+      
+      // Clear local state regardless of error
+      setUser(null);
+      
+      if (error) {
+        console.error('Logout error:', error);
+        // Don't throw error to prevent blocking logout
+      } else {
+        console.log('Successfully signed out');
+      }
+    } catch (error) {
+      console.error('Unexpected logout error:', error);
+      // Clear local state even on unexpected errors
+      setUser(null);
+    }
   };
 
   const value = {

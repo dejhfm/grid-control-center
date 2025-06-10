@@ -55,22 +55,57 @@ export const useUpdateCellValue = () => {
       columnId: string;
       value: any;
     }) => {
-      const { data, error } = await supabase
+      console.log('Updating cell value:', { tableId, rowIndex, columnId, value });
+      
+      // First check if a record exists
+      const { data: existingData } = await supabase
         .from('table_data')
-        .upsert({
-          table_id: tableId,
-          row_index: rowIndex,
-          column_id: columnId,
-          value: value,
-        })
-        .select()
-        .single();
+        .select('id')
+        .eq('table_id', tableId)
+        .eq('row_index', rowIndex)
+        .eq('column_id', columnId)
+        .maybeSingle();
 
-      if (error) throw error;
-      return data;
+      let result;
+      
+      if (existingData) {
+        // Update existing record
+        const { data, error } = await supabase
+          .from('table_data')
+          .update({ value: value })
+          .eq('table_id', tableId)
+          .eq('row_index', rowIndex)
+          .eq('column_id', columnId)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
+      } else {
+        // Insert new record
+        const { data, error } = await supabase
+          .from('table_data')
+          .insert({
+            table_id: tableId,
+            row_index: rowIndex,
+            column_id: columnId,
+            value: value,
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
+      }
+
+      console.log('Cell update successful:', result);
+      return result;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['table-data', variables.tableId] });
+    },
+    onError: (error) => {
+      console.error('Error updating cell:', error);
     },
   });
 };

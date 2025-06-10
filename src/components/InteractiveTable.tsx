@@ -8,6 +8,7 @@ import { Eye, Edit, Settings, Plus, Trash, Cog } from "lucide-react";
 import { useTableColumns, useTableData, useUpdateCellValue, useUpdateColumn } from "@/hooks/useTableData";
 import { ColumnConfigModal } from "@/components/ColumnConfigModal";
 import { Tables } from "@/integrations/supabase/types";
+import { useToast } from "@/hooks/use-toast";
 
 type CellType = 'text' | 'checkbox' | 'select';
 type TableMode = 'view' | 'edit' | 'structure';
@@ -37,12 +38,15 @@ export const InteractiveTable = ({
   const { data: tableData = [], isLoading: dataLoading } = useTableData(tableId);
   const updateCellMutation = useUpdateCellValue();
   const updateColumnMutation = useUpdateColumn();
+  const { toast } = useToast();
 
   // Transform database data into the component's expected format
   const [data, setData] = useState<CellData[][]>([]);
 
   useEffect(() => {
     if (columns.length > 0) {
+      console.log('Transforming data with columns:', columns.length, 'tableData:', tableData.length);
+      
       // Get the maximum row index to determine how many rows we have
       const maxRowIndex = tableData.length > 0 ? Math.max(...tableData.map(d => d.row_index)) : -1;
       const numRows = Math.max(maxRowIndex + 1, 5); // Ensure at least 5 rows
@@ -82,9 +86,14 @@ export const InteractiveTable = ({
 
   const updateCellValue = useCallback(async (rowIndex: number, colIndex: number, value: any) => {
     const column = columns[colIndex];
-    if (!column) return;
+    if (!column) {
+      console.error('Column not found at index:', colIndex);
+      return;
+    }
 
-    // Update local state immediately for better UX
+    console.log('UpdateCellValue called:', { rowIndex, colIndex, value, columnId: column.id });
+
+    // Update local state immediately for better UX (optimistic update)
     setData(prevData => {
       const newData = [...prevData];
       if (newData[rowIndex] && newData[rowIndex][colIndex]) {
@@ -104,10 +113,15 @@ export const InteractiveTable = ({
         columnId: column.id,
         value,
       });
-      console.log('Cell updated successfully:', { rowIndex, colIndex, value });
+      
+      toast({
+        title: "Erfolgreich gespeichert",
+        description: "Die Änderung wurde automatisch gespeichert.",
+      });
     } catch (error) {
       console.error('Error updating cell:', error);
-      // Revert local state on error
+      
+      // Revert optimistic update on error
       setData(prevData => {
         const revertedData = [...prevData];
         const originalCellData = tableData.find(d => d.row_index === rowIndex && d.column_id === column.id);
@@ -127,8 +141,14 @@ export const InteractiveTable = ({
         }
         return revertedData;
       });
+      
+      toast({
+        title: "Fehler beim Speichern",
+        description: "Die Änderung konnte nicht gespeichert werden.",
+        variant: "destructive",
+      });
     }
-  }, [columns, tableData, tableId, updateCellMutation]);
+  }, [columns, tableData, tableId, updateCellMutation, toast]);
 
   const addRow = () => {
     const newRow = columns.map(col => ({
@@ -140,7 +160,7 @@ export const InteractiveTable = ({
   };
 
   const renderCell = (cell: CellData, rowIndex: number, colIndex: number) => {
-    const cellKey = `${rowIndex}-${colIndex}`;
+    const cellKey = `${rowIndex}-${colIndex}-${cell.value}`;
     
     if (mode === 'view') {
       switch (cell.type) {
