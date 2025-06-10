@@ -16,14 +16,31 @@ export const useDeleteRow = () => {
 
       if (error) throw error;
 
-      // Update row indices for rows that come after the deleted row
-      const { error: updateError } = await supabase
+      // Get all rows that need to be updated (rows after the deleted row)
+      const { data: rowsToUpdate, error: fetchError } = await supabase
         .from('table_data')
-        .update({ row_index: supabase.raw('row_index - 1') })
+        .select('id, row_index')
         .eq('table_id', tableId)
         .gt('row_index', rowIndex);
 
-      if (updateError) throw updateError;
+      if (fetchError) throw fetchError;
+
+      // Update each row individually
+      if (rowsToUpdate && rowsToUpdate.length > 0) {
+        const updatePromises = rowsToUpdate.map(row => 
+          supabase
+            .from('table_data')
+            .update({ row_index: row.row_index - 1 })
+            .eq('id', row.id)
+        );
+
+        const results = await Promise.all(updatePromises);
+        
+        // Check for any errors
+        for (const result of results) {
+          if (result.error) throw result.error;
+        }
+      }
 
       return { tableId, rowIndex };
     },

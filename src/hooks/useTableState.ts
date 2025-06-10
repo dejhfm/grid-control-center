@@ -110,13 +110,20 @@ export const useTableState = (
           year = (column.options as any)?.year;
         }
         
-        // Safely extract options for weekly_schedule
+        // Safely extract options for weekly_schedule and select types
         let options;
-        if (column.column_type === 'weekly_schedule' && column.options) {
+        if ((column.column_type === 'weekly_schedule' || column.column_type === 'select') && column.options) {
           try {
-            options = Array.isArray(column.options) ? column.options : [];
+            // Ensure options is always an array
+            if (Array.isArray(column.options)) {
+              options = column.options;
+            } else {
+              console.log('Column options is not an array:', column.options);
+              options = [];
+            }
+            console.log(`Column ${column.name} (${column.column_type}) options:`, options);
           } catch (error) {
-            console.error('Error processing weekly_schedule options:', error);
+            console.error(`Error processing ${column.column_type} options:`, error);
             options = [];
           }
         } else {
@@ -168,7 +175,7 @@ export const useTableState = (
 
       let options;
       try {
-        if (col.column_type === 'weekly_schedule' && col.options) {
+        if ((col.column_type === 'weekly_schedule' || col.column_type === 'select') && col.options) {
           options = Array.isArray(col.options) ? col.options : [];
         } else {
           options = col.options as string[] | undefined;
