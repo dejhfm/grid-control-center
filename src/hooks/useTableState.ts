@@ -2,13 +2,14 @@
 import { useState, useEffect } from 'react';
 import { Tables } from '@/integrations/supabase/types';
 
-export type CellType = 'text' | 'checkbox' | 'select' | 'pdf_upload';
+export type CellType = 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks';
 export type TableMode = 'view' | 'edit' | 'structure';
 
 export interface CellData {
   value: any;
   type: CellType;
   options?: string[];
+  year?: number;
 }
 
 export const useTableState = (
@@ -44,10 +45,17 @@ export const useTableState = (
             cellValue = cellData?.value || '';
           }
           
+          // Extract year from options for calendar_weeks type
+          let year;
+          if (column.column_type === 'calendar_weeks' && column.options) {
+            year = (column.options as any)?.year;
+          }
+          
           row.push({
             value: cellValue,
             type: column.column_type as CellType,
             options: column.options as string[] | undefined,
+            year: year,
           });
         }
         
@@ -59,11 +67,28 @@ export const useTableState = (
   }, [columns, tableData]);
 
   const addRow = () => {
-    const newRow = columns.map(col => ({
-      value: col.column_type === 'checkbox' ? false : col.column_type === 'pdf_upload' ? null : '',
-      type: col.column_type as CellType,
-      options: col.options as string[] | undefined
-    }));
+    const newRow = columns.map(col => {
+      let defaultValue;
+      if (col.column_type === 'checkbox') {
+        defaultValue = false;
+      } else if (col.column_type === 'pdf_upload') {
+        defaultValue = null;
+      } else {
+        defaultValue = '';
+      }
+
+      let year;
+      if (col.column_type === 'calendar_weeks' && col.options) {
+        year = (col.options as any)?.year;
+      }
+
+      return {
+        value: defaultValue,
+        type: col.column_type as CellType,
+        options: col.options as string[] | undefined,
+        year: year,
+      };
+    });
     setData(prevData => [...prevData, newRow]);
   };
 

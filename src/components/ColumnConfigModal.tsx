@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
+import { getCurrentYear } from '@/utils/calendarWeeks';
 
 type TableColumn = Tables<'table_columns'>;
 
@@ -20,19 +21,28 @@ interface ColumnConfigModalProps {
 }
 
 export const ColumnConfigModal = ({ isOpen, onClose, column }: ColumnConfigModalProps) => {
-  const [columnType, setColumnType] = useState<'text' | 'checkbox' | 'select' | 'pdf_upload'>(column.column_type as any);
+  const [columnType, setColumnType] = useState<'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks'>(column.column_type as any);
   const [options, setOptions] = useState<string[]>((column.options as string[]) || []);
   const [newOption, setNewOption] = useState('');
+  const [calendarYear, setCalendarYear] = useState<number>((column.options as any)?.year || getCurrentYear());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const updateColumnMutation = useMutation({
     mutationFn: async () => {
+      let optionsToSave = null;
+      
+      if (columnType === 'select') {
+        optionsToSave = options;
+      } else if (columnType === 'calendar_weeks') {
+        optionsToSave = { year: calendarYear };
+      }
+
       const { error } = await supabase
         .from('table_columns')
         .update({
           column_type: columnType,
-          options: columnType === 'select' ? options : null,
+          options: optionsToSave,
         })
         .eq('id', column.id);
 
@@ -80,7 +90,7 @@ export const ColumnConfigModal = ({ isOpen, onClose, column }: ColumnConfigModal
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium mb-2 block">Feld-Typ</label>
-            <Select value={columnType} onValueChange={(value: 'text' | 'checkbox' | 'select' | 'pdf_upload') => setColumnType(value)}>
+            <Select value={columnType} onValueChange={(value: 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks') => setColumnType(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -88,6 +98,7 @@ export const ColumnConfigModal = ({ isOpen, onClose, column }: ColumnConfigModal
                 <SelectItem value="text">Textfeld</SelectItem>
                 <SelectItem value="checkbox">Checkbox</SelectItem>
                 <SelectItem value="select">Dropdown-Liste</SelectItem>
+                <SelectItem value="calendar_weeks">Dropdown-Liste mit Kalenderwochen</SelectItem>
                 <SelectItem value="pdf_upload">PDF-Upload</SelectItem>
               </SelectContent>
             </Select>
@@ -123,6 +134,24 @@ export const ColumnConfigModal = ({ isOpen, onClose, column }: ColumnConfigModal
                   </Badge>
                 ))}
               </div>
+            </div>
+          )}
+
+          {columnType === 'calendar_weeks' && (
+            <div>
+              <label className="text-sm font-medium mb-2 block">Jahr für Kalenderwochen</label>
+              <Input
+                type="number"
+                min="2020"
+                max="2030"
+                value={calendarYear}
+                onChange={(e) => setCalendarYear(parseInt(e.target.value) || getCurrentYear())}
+                className="w-32"
+                placeholder="Jahr"
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                Die Kalenderwochen werden für das ausgewählte Jahr generiert (KW 1-52/53).
+              </p>
             </div>
           )}
 

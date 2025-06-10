@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CellData, TableMode } from "@/hooks/useTableState";
 import { PdfUploadCellSecure } from "@/components/PdfUploadCellSecure";
 import { useState, useEffect } from "react";
+import { generateCalendarWeeks, parseCalendarWeekValue } from "@/utils/calendarWeeks";
 
 interface TableCellProps {
   cell: CellData;
@@ -61,6 +62,12 @@ export const TableCell = ({
         return <Checkbox checked={Boolean(cell.value)} disabled />;
       case 'select':
         return <span className="text-sm">{cell.value || '-'}</span>;
+      case 'calendar_weeks':
+        const parsedWeek = parseCalendarWeekValue(String(cell.value || ''));
+        if (parsedWeek) {
+          return <span className="text-sm">KW {parsedWeek.week} ({parsedWeek.year})</span>;
+        }
+        return <span className="text-sm">{cell.value || '-'}</span>;
       case 'pdf_upload':
         return (
           <PdfUploadCellSecure
@@ -112,6 +119,30 @@ export const TableCell = ({
           <SelectContent className="bg-background">
             {cell.options?.map((option, i) => (
               <SelectItem key={i} value={option}>{option}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    case 'calendar_weeks':
+      const year = cell.year || new Date().getFullYear();
+      const calendarWeeks = generateCalendarWeeks(year);
+      
+      return (
+        <Select 
+          value={String(cell.value || '')} 
+          onValueChange={(value) => {
+            console.log('Calendar week changed:', { rowIndex, colIndex, value });
+            onCellUpdate(rowIndex, colIndex, value);
+          }}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Kalenderwoche auswählen..." />
+          </SelectTrigger>
+          <SelectContent className="bg-background max-h-60">
+            {calendarWeeks.map((week) => (
+              <SelectItem key={week.value} value={week.value}>
+                {week.label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
