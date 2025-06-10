@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
 import { getCurrentYear } from '@/utils/calendarWeeks';
+import { CellType } from '@/hooks/useTableState';
 
 type TableColumn = Tables<'table_columns'>;
 
@@ -21,7 +22,7 @@ interface ColumnConfigModalProps {
 }
 
 export const ColumnConfigModal = ({ isOpen, onClose, column }: ColumnConfigModalProps) => {
-  const [columnType, setColumnType] = useState<'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks'>(column.column_type as any);
+  const [columnType, setColumnType] = useState<CellType>(column.column_type as CellType);
   const [options, setOptions] = useState<string[]>((column.options as string[]) || []);
   const [newOption, setNewOption] = useState('');
   const [calendarYear, setCalendarYear] = useState<number>((column.options as any)?.year || getCurrentYear());
@@ -90,7 +91,7 @@ export const ColumnConfigModal = ({ isOpen, onClose, column }: ColumnConfigModal
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium mb-2 block">Feld-Typ</label>
-            <Select value={columnType} onValueChange={(value: 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks') => setColumnType(value)}>
+            <Select value={columnType} onValueChange={(value: CellType) => setColumnType(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
