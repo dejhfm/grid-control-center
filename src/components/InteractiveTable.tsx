@@ -8,6 +8,7 @@ import { TableModeSelector } from "@/components/TableModeSelector";
 import { TableHeader } from "@/components/TableHeader";
 import { TableRow } from "@/components/TableRow";
 import { ColumnConfigModal } from "@/components/ColumnConfigModal";
+import { SendEmailButton } from "@/components/SendEmailButton";
 import { Tables } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,13 +17,15 @@ interface InteractiveTableProps {
   tableId: string;
   canEdit?: boolean;
   canStructure?: boolean;
+  isOwner?: boolean;
 }
 
 export const InteractiveTable = ({ 
   tableName, 
   tableId,
   canEdit = true,
-  canStructure = true 
+  canStructure = true,
+  isOwner = false
 }: InteractiveTableProps) => {
   const [mode, setMode] = useState<TableMode>('view');
   const [configColumn, setConfigColumn] = useState<Tables<'table_columns'> | null>(null);
@@ -117,12 +120,19 @@ export const InteractiveTable = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">{tableName}</h2>
-        <TableModeSelector
-          mode={mode}
-          onModeChange={setMode}
-          canEdit={canEdit}
-          canStructure={canStructure}
-        />
+        <div className="flex items-center space-x-4">
+          <SendEmailButton
+            tableId={tableId}
+            tableName={tableName}
+            canSendEmails={isOwner}
+          />
+          <TableModeSelector
+            mode={mode}
+            onModeChange={setMode}
+            canEdit={canEdit}
+            canStructure={canStructure}
+          />
+        </div>
       </div>
 
       <div className="border rounded-lg overflow-hidden">

@@ -125,6 +125,8 @@ export const useTableState = (
               cellValue = null;
             }
             console.log(`Row ${rowIndex}, Col ${colIndex} - Weekly schedule value:`, cellValue);
+          } else if (column.column_type === 'user_dropdown') {
+            cellValue = cellData?.value || '';
           } else {
             cellValue = cellData?.value || '';
           }

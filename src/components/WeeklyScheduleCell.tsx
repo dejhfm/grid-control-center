@@ -123,10 +123,8 @@ const WeeklyScheduleCellContent = ({
   };
 
   const handleOpenPopup = () => {
-    if (!disabled) {
-      console.log('Opening WeeklySchedule popup with value:', value);
-      setIsPopupOpen(true);
-    }
+    console.log('Opening WeeklySchedule popup with value:', value);
+    setIsPopupOpen(true);
   };
 
   const handleSave = (data: WeeklyScheduleData) => {
@@ -156,7 +154,6 @@ const WeeklyScheduleCellContent = ({
         variant={hasData ? "default" : "outline"}
         size="sm"
         onClick={handleOpenPopup}
-        disabled={disabled}
         className="w-full"
       >
         <Calendar className="w-4 h-4 mr-2" />

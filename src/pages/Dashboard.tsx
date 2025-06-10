@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Header } from "@/components/Header";
 import { TableCard } from "@/components/TableCard";
@@ -85,6 +84,8 @@ export const Dashboard = () => {
       ? 'owner' 
       : selectedTableData.table_permissions.find(p => p.user_id === user?.id)?.permission || 'viewer';
 
+    const isOwner = selectedTableData.owner_id === user?.id;
+
     return (
       <div className="min-h-screen bg-background">
         <Header 
@@ -110,6 +111,7 @@ export const Dashboard = () => {
             tableId={selectedTableData.id}
             canEdit={userPermission !== 'viewer'}
             canStructure={userPermission === 'owner'}
+            isOwner={isOwner}
           />
         </div>
         
