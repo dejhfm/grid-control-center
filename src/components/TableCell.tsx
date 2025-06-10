@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CellData, TableMode } from "@/hooks/useTableState";
-import { PdfUploadCell } from "@/components/PdfUploadCell";
+import { PdfUploadCellSecure } from "@/components/PdfUploadCellSecure";
 
 interface TableCellProps {
   cell: CellData;
@@ -22,7 +22,10 @@ export const TableCell = ({
   tableId,
   onCellUpdate 
 }: TableCellProps) => {
-  // Remove cellKey to fix text input bug - React doesn't need to recreate components
+  // Sanitize input to prevent XSS
+  const sanitizeInput = (value: string): string => {
+    return value.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  };
   
   if (mode === 'view') {
     switch (cell.type) {
@@ -32,7 +35,7 @@ export const TableCell = ({
         return <span className="text-sm">{cell.value || '-'}</span>;
       case 'pdf_upload':
         return (
-          <PdfUploadCell
+          <PdfUploadCellSecure
             value={cell.value}
             rowIndex={rowIndex}
             colIndex={colIndex}
@@ -42,7 +45,7 @@ export const TableCell = ({
           />
         );
       default:
-        return <span className="text-sm">{cell.value || '-'}</span>;
+        return <span className="text-sm">{String(cell.value || '-')}</span>;
     }
   }
 
@@ -78,7 +81,7 @@ export const TableCell = ({
       );
     case 'pdf_upload':
       return (
-        <PdfUploadCell
+        <PdfUploadCellSecure
           value={cell.value}
           rowIndex={rowIndex}
           colIndex={colIndex}
@@ -92,11 +95,13 @@ export const TableCell = ({
         <Input
           value={String(cell.value || '')}
           onChange={(e) => {
-            console.log('Input changed:', { rowIndex, colIndex, value: e.target.value });
-            onCellUpdate(rowIndex, colIndex, e.target.value);
+            const sanitizedValue = sanitizeInput(e.target.value);
+            console.log('Input changed:', { rowIndex, colIndex, value: sanitizedValue });
+            onCellUpdate(rowIndex, colIndex, sanitizedValue);
           }}
           className="w-full"
           placeholder="Text eingeben..."
+          maxLength={1000} // Limit input length for security
         />
       );
   }

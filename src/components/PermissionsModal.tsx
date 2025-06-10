@@ -4,10 +4,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Shield, AlertTriangle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useRateLimit } from '@/hooks/useRateLimit';
 
 interface PermissionsModalProps {
   isOpen: boolean;
@@ -18,8 +19,10 @@ interface PermissionsModalProps {
 export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalProps) => {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newPermission, setNewPermission] = useState<'viewer' | 'editor'>('viewer');
+  const [isValidating, setIsValidating] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { checkRateLimit } = useRateLimit();
 
   const { data: permissions = [] } = useQuery({
     queryKey: ['table-permissions', tableId],
@@ -39,17 +42,67 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
     enabled: isOpen && !!tableId,
   });
 
+  const validateUserEmail = async (email: string): Promise<boolean> => {
+    if (!email.trim()) return false;
+    
+    setIsValidating(true);
+    try {
+      const { data, error } = await supabase.rpc('user_exists', { user_email: email.trim() });
+      
+      if (error) {
+        console.error('User validation error:', error);
+        return false;
+      }
+      
+      return data === true;
+    } catch (error) {
+      console.error('User validation failed:', error);
+      return false;
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
   const addPermissionMutation = useMutation({
     mutationFn: async ({ email, permission }: { email: string; permission: 'viewer' | 'editor' }) => {
-      // First find the user by email
+      // Check rate limiting
+      const isRateLimited = await checkRateLimit({
+        operationType: 'add_permission',
+        maxAttempts: 10,
+        windowMinutes: 60
+      });
+
+      if (isRateLimited) {
+        throw new Error('Zu viele Berechtigungsänderungen. Bitte warten Sie eine Stunde.');
+      }
+
+      // Validate user exists
+      const userExists = await validateUserEmail(email);
+      if (!userExists) {
+        throw new Error('Benutzer nicht gefunden oder ungültige E-Mail');
+      }
+
+      // Get user profile
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('username', email)
+        .eq('username', email.trim())
         .single();
 
       if (profileError || !profiles) {
-        throw new Error('Benutzer nicht gefunden');
+        throw new Error('Benutzer konnte nicht gefunden werden');
+      }
+
+      // Check if permission already exists
+      const { data: existingPermission } = await supabase
+        .from('table_permissions')
+        .select('id')
+        .eq('table_id', tableId)
+        .eq('user_id', profiles.id)
+        .single();
+
+      if (existingPermission) {
+        throw new Error('Benutzer hat bereits eine Berechtigung für diese Tabelle');
       }
 
       const { data, error } = await supabase
@@ -85,6 +138,17 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
 
   const removePermissionMutation = useMutation({
     mutationFn: async (permissionId: string) => {
+      // Check rate limiting
+      const isRateLimited = await checkRateLimit({
+        operationType: 'remove_permission',
+        maxAttempts: 20,
+        windowMinutes: 60
+      });
+
+      if (isRateLimited) {
+        throw new Error('Zu viele Berechtigungsänderungen. Bitte warten Sie eine Stunde.');
+      }
+
       const { error } = await supabase
         .from('table_permissions')
         .delete()
@@ -99,19 +163,47 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
         description: 'Die Berechtigung wurde erfolgreich entfernt.',
       });
     },
+    onError: (error: any) => {
+      toast({
+        title: 'Fehler',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
   });
 
-  const handleAddPermission = () => {
-    if (newUserEmail && newPermission) {
-      addPermissionMutation.mutate({ email: newUserEmail, permission: newPermission });
+  const handleAddPermission = async () => {
+    if (!newUserEmail.trim() || !newPermission) {
+      toast({
+        title: 'Ungültige Eingabe',
+        description: 'Bitte geben Sie eine gültige E-Mail und Berechtigung an.',
+        variant: 'destructive',
+      });
+      return;
     }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newUserEmail.trim())) {
+      toast({
+        title: 'Ungültige E-Mail',
+        description: 'Bitte geben Sie eine gültige E-Mail-Adresse ein.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    addPermissionMutation.mutate({ email: newUserEmail.trim(), permission: newPermission });
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-background">
+      <DialogContent className="bg-background max-w-md">
         <DialogHeader>
-          <DialogTitle>Berechtigungen verwalten</DialogTitle>
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary" />
+            <DialogTitle>Berechtigungen verwalten</DialogTitle>
+          </div>
         </DialogHeader>
         
         <div className="space-y-4">
@@ -121,8 +213,13 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
               value={newUserEmail}
               onChange={(e) => setNewUserEmail(e.target.value)}
               className="flex-1"
+              disabled={addPermissionMutation.isPending || isValidating}
             />
-            <Select value={newPermission} onValueChange={(value: 'viewer' | 'editor') => setNewPermission(value)}>
+            <Select 
+              value={newPermission} 
+              onValueChange={(value: 'viewer' | 'editor') => setNewPermission(value)}
+              disabled={addPermissionMutation.isPending}
+            >
               <SelectTrigger className="w-32">
                 <SelectValue />
               </SelectTrigger>
@@ -131,32 +228,54 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
                 <SelectItem value="editor">Bearbeitung</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={handleAddPermission} disabled={addPermissionMutation.isPending}>
-              <Plus className="w-4 h-4" />
+            <Button 
+              onClick={handleAddPermission} 
+              disabled={addPermissionMutation.isPending || isValidating || !newUserEmail.trim()}
+              size="sm"
+            >
+              {addPermissionMutation.isPending || isValidating ? (
+                <div className="w-4 h-4 animate-spin rounded-full border-2 border-background border-t-foreground" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
             </Button>
           </div>
 
-          <div className="space-y-2">
-            {permissions.map((permission) => (
-              <div key={permission.id} className="flex items-center justify-between p-2 border rounded">
-                <div>
-                  <span className="font-medium">
-                    {permission.user_profile.full_name || permission.user_profile.username}
-                  </span>
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    ({permission.permission === 'viewer' ? 'Ansicht' : 'Bearbeitung'})
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removePermissionMutation.mutate(permission.id)}
-                  disabled={removePermissionMutation.isPending}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+          {newUserEmail.trim() && !isValidating && (
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              <span>Benutzer wird beim Hinzufügen validiert</span>
+            </div>
+          )}
+
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {permissions.length === 0 ? (
+              <div className="text-sm text-muted-foreground text-center py-4">
+                Keine zusätzlichen Berechtigungen vergeben
               </div>
-            ))}
+            ) : (
+              permissions.map((permission) => (
+                <div key={permission.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex-1">
+                    <span className="font-medium block">
+                      {permission.user_profile.full_name || permission.user_profile.username}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {permission.permission === 'viewer' ? 'Ansicht' : 'Bearbeitung'}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removePermissionMutation.mutate(permission.id)}
+                    disabled={removePermissionMutation.isPending}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </DialogContent>

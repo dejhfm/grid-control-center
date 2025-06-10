@@ -9,6 +9,58 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      permission_audit: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          performed_by: string
+          permission_level: Database["public"]["Enums"]["permission_level"]
+          table_id: string
+          target_user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          performed_by: string
+          permission_level: Database["public"]["Enums"]["permission_level"]
+          table_id: string
+          target_user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          performed_by?: string
+          permission_level?: Database["public"]["Enums"]["permission_level"]
+          table_id?: string
+          target_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_audit_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permission_audit_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permission_audit_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -35,6 +87,38 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
+      }
+      rate_limits: {
+        Row: {
+          id: string
+          operation_count: number
+          operation_type: string
+          user_id: string
+          window_start: string
+        }
+        Insert: {
+          id?: string
+          operation_count?: number
+          operation_type: string
+          user_id: string
+          window_start?: string
+        }
+        Update: {
+          id?: string
+          operation_count?: number
+          operation_type?: string
+          user_id?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rate_limits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       table_columns: {
         Row: {
@@ -213,6 +297,10 @@ export type Database = {
           table_id: string
           required_permission: Database["public"]["Enums"]["permission_level"]
         }
+        Returns: boolean
+      }
+      user_exists: {
+        Args: { user_email: string }
         Returns: boolean
       }
     }
