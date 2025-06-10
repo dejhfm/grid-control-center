@@ -305,7 +305,12 @@ export type Database = {
       }
     }
     Enums: {
-      column_type: "text" | "checkbox" | "select" | "pdf_upload"
+      column_type:
+        | "text"
+        | "checkbox"
+        | "select"
+        | "pdf_upload"
+        | "calendar_weeks"
       permission_level: "owner" | "editor" | "viewer"
     }
     CompositeTypes: {
@@ -422,7 +427,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      column_type: ["text", "checkbox", "select", "pdf_upload"],
+      column_type: [
+        "text",
+        "checkbox",
+        "select",
+        "pdf_upload",
+        "calendar_weeks",
+      ],
       permission_level: ["owner", "editor", "viewer"],
     },
   },
