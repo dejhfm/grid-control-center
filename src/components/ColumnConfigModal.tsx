@@ -15,6 +15,7 @@ import { Plus, X } from 'lucide-react';
 import { Tables } from '@/integrations/supabase/types';
 import { useUpdateColumn } from '@/hooks/useTableData';
 import { useToast } from '@/hooks/use-toast';
+import { getCurrentYear } from '@/utils/calendarWeeks';
 
 type ColumnType = 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks' | 'weekly_schedule';
 
@@ -32,63 +33,122 @@ export const ColumnConfigModal = ({
   const [columnType, setColumnType] = useState<ColumnType>(column.column_type as ColumnType);
   const [options, setOptions] = useState<string[]>([]);
   const [newOption, setNewOption] = useState('');
+  const [calendarYear, setCalendarYear] = useState<number>(getCurrentYear());
   const updateColumnMutation = useUpdateColumn();
   const { toast } = useToast();
 
+  // Helper function to safely extract options from database
+  const safeExtractOptions = (dbOptions: any): string[] => {
+    try {
+      if (!dbOptions) return [];
+      
+      if (Array.isArray(dbOptions)) {
+        return dbOptions
+          .map(option => {
+            if (typeof option === 'string') {
+              return option.trim();
+            } else if (typeof option === 'number' || typeof option === 'boolean') {
+              return String(option).trim();
+            }
+            return null;
+          })
+          .filter((option): option is string => option !== null && option.length > 0);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error extracting options:', error);
+      return [];
+    }
+  };
+
+  // Helper function to safely extract calendar year from options
+  const safeExtractCalendarYear = (dbOptions: any): number => {
+    try {
+      if (dbOptions && typeof dbOptions === 'object' && !Array.isArray(dbOptions)) {
+        const year = dbOptions.year;
+        if (typeof year === 'number' && year > 2000 && year < 3000) {
+          return year;
+        }
+      }
+      return getCurrentYear();
+    } catch (error) {
+      console.error('Error extracting calendar year:', error);
+      return getCurrentYear();
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
-      setColumnType(column.column_type as ColumnType);
-      
-      // Load existing options for select and weekly_schedule columns
-      if ((column.column_type === 'select' || column.column_type === 'weekly_schedule') && column.options) {
-        try {
-          // Safely convert JSON options to string array
-          let existingOptions: string[] = [];
-          
-          if (Array.isArray(column.options)) {
-            // Filter and convert each option to string, ensuring only valid strings are included
-            existingOptions = column.options
-              .map(option => {
-                // Convert to string and trim
-                if (typeof option === 'string') {
-                  return option.trim();
-                } else if (typeof option === 'number' || typeof option === 'boolean') {
-                  return String(option).trim();
-                }
-                return null;
-              })
-              .filter((option): option is string => option !== null && option.length > 0);
-          }
-          
-          console.log('Loading existing options:', existingOptions);
-          setOptions(existingOptions);
-        } catch (error) {
-          console.error('Error loading column options:', error);
+      try {
+        setColumnType(column.column_type as ColumnType);
+        
+        // Load existing options for select and weekly_schedule columns
+        if (column.column_type === 'select' || column.column_type === 'weekly_schedule') {
+          const extractedOptions = safeExtractOptions(column.options);
+          console.log('Loading existing options:', extractedOptions);
+          setOptions(extractedOptions);
+        } else {
           setOptions([]);
         }
-      } else {
+
+        // Load existing year for calendar_weeks columns
+        if (column.column_type === 'calendar_weeks') {
+          const extractedYear = safeExtractCalendarYear(column.options);
+          console.log('Loading existing calendar year:', extractedYear);
+          setCalendarYear(extractedYear);
+        } else {
+          setCalendarYear(getCurrentYear());
+        }
+
+        setNewOption('');
+      } catch (error) {
+        console.error('Error in ColumnConfigModal useEffect:', error);
         setOptions([]);
+        setCalendarYear(getCurrentYear());
+        setNewOption('');
       }
-      setNewOption('');
     }
   }, [column, isOpen]);
 
   const addOption = () => {
-    if (newOption.trim() && !options.includes(newOption.trim())) {
-      setOptions([...options, newOption.trim()]);
-      setNewOption('');
+    try {
+      if (newOption.trim() && !options.includes(newOption.trim())) {
+        setOptions([...options, newOption.trim()]);
+        setNewOption('');
+      }
+    } catch (error) {
+      console.error('Error adding option:', error);
     }
   };
 
   const removeOption = (index: number) => {
-    setOptions(options.filter((_, i) => i !== index));
+    try {
+      setOptions(options.filter((_, i) => i !== index));
+    } catch (error) {
+      console.error('Error removing option:', error);
+    }
+  };
+
+  const updateOption = (index: number, value: string) => {
+    try {
+      const newOptions = [...options];
+      newOptions[index] = value;
+      setOptions(newOptions);
+    } catch (error) {
+      console.error('Error updating option:', error);
+    }
   };
 
   const handleSave = async () => {
     try {
-      const finalOptions = (columnType === 'select' || columnType === 'weekly_schedule') && options.length > 0 
-        ? options 
-        : undefined;
+      let finalOptions: any = undefined;
+
+      if (columnType === 'select' || columnType === 'weekly_schedule') {
+        finalOptions = options.length > 0 ? options : undefined;
+      } else if (columnType === 'calendar_weeks') {
+        finalOptions = { year: calendarYear };
+      }
 
       console.log('Saving column with options:', finalOptions);
 
@@ -115,10 +175,23 @@ export const ColumnConfigModal = ({
   };
 
   const handleColumnTypeChange = (value: string) => {
-    setColumnType(value as ColumnType);
+    try {
+      setColumnType(value as ColumnType);
+      
+      // Reset options when changing column type
+      if (value !== 'select' && value !== 'weekly_schedule') {
+        setOptions([]);
+      }
+      if (value !== 'calendar_weeks') {
+        setCalendarYear(getCurrentYear());
+      }
+    } catch (error) {
+      console.error('Error changing column type:', error);
+    }
   };
 
   const shouldShowOptions = columnType === 'select' || columnType === 'weekly_schedule';
+  const shouldShowCalendarYear = columnType === 'calendar_weeks';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -145,6 +218,21 @@ export const ColumnConfigModal = ({
             </Select>
           </div>
 
+          {shouldShowCalendarYear && (
+            <div>
+              <Label htmlFor="calendar-year">Jahr für Kalenderwochen</Label>
+              <Input
+                id="calendar-year"
+                type="number"
+                min="2020"
+                max="2030"
+                value={calendarYear}
+                onChange={(e) => setCalendarYear(parseInt(e.target.value) || getCurrentYear())}
+                className="w-full"
+              />
+            </div>
+          )}
+
           {shouldShowOptions && (
             <div>
               <Label>
@@ -155,11 +243,7 @@ export const ColumnConfigModal = ({
                   <div key={index} className="flex items-center gap-2">
                     <Input
                       value={option}
-                      onChange={(e) => {
-                        const newOptions = [...options];
-                        newOptions[index] = e.target.value;
-                        setOptions(newOptions);
-                      }}
+                      onChange={(e) => updateOption(index, e.target.value)}
                       className="flex-1"
                     />
                     <Button
