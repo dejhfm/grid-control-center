@@ -121,23 +121,59 @@ export const useUpdateColumn = () => {
     }: {
       columnId: string;
       columnType: 'text' | 'checkbox' | 'select' | 'pdf_upload' | 'calendar_weeks' | 'weekly_schedule';
-      options?: string[];
+      options?: any;
     }) => {
+      console.log('Updating column:', { columnId, columnType, options });
+      
+      // Sichere Datenverarbeitung für options
+      let processedOptions = null;
+      
+      if (options !== undefined && options !== null) {
+        if (columnType === 'select' || columnType === 'weekly_schedule') {
+          // Für select und weekly_schedule: Array von Strings
+          if (Array.isArray(options) && options.length > 0) {
+            processedOptions = options.filter(opt => 
+              opt != null && String(opt).trim().length > 0
+            );
+            if (processedOptions.length === 0) {
+              processedOptions = null;
+            }
+          }
+        } else if (columnType === 'calendar_weeks') {
+          // Für calendar_weeks: Objekt mit year
+          if (typeof options === 'object' && options.year) {
+            processedOptions = { year: options.year };
+          }
+        }
+      }
+
+      console.log('Processed options:', processedOptions);
+
       const { data, error } = await supabase
         .from('table_columns')
         .update({
           column_type: columnType,
-          options: columnType === 'select' || columnType === 'weekly_schedule' ? options : null,
+          options: processedOptions,
         })
         .eq('id', columnId)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
+      
+      console.log('Column updated successfully:', data);
       return data;
     },
     onSuccess: (data) => {
+      console.log('Invalidating queries for table:', data.table_id);
       queryClient.invalidateQueries({ queryKey: ['table-columns', data.table_id] });
+      queryClient.invalidateQueries({ queryKey: ['table-data', data.table_id] });
+    },
+    onError: (error) => {
+      console.error('Error in useUpdateColumn:', error);
     },
   });
 };

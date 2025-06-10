@@ -37,22 +37,16 @@ export const ColumnConfigModal = ({
   const updateColumnMutation = useUpdateColumn();
   const { toast } = useToast();
 
-  // Helper function to safely extract options from database
+  // Sichere Extraktion von Optionen aus der Datenbank
   const safeExtractOptions = (dbOptions: any): string[] => {
     try {
       if (!dbOptions) return [];
       
       if (Array.isArray(dbOptions)) {
         return dbOptions
-          .map(option => {
-            if (typeof option === 'string') {
-              return option.trim();
-            } else if (typeof option === 'number' || typeof option === 'boolean') {
-              return String(option).trim();
-            }
-            return null;
-          })
-          .filter((option): option is string => option !== null && option.length > 0);
+          .filter(option => option != null) // Filtere null/undefined aus
+          .map(option => String(option).trim()) // Konvertiere zu String
+          .filter(option => option.length > 0); // Filtere leere Strings aus
       }
       
       return [];
@@ -62,7 +56,7 @@ export const ColumnConfigModal = ({
     }
   };
 
-  // Helper function to safely extract calendar year from options
+  // Sichere Extraktion des Kalenderjahrs
   const safeExtractCalendarYear = (dbOptions: any): number => {
     try {
       if (dbOptions && typeof dbOptions === 'object' && !Array.isArray(dbOptions)) {
@@ -79,23 +73,21 @@ export const ColumnConfigModal = ({
   };
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && column) {
       try {
         setColumnType(column.column_type as ColumnType);
         
-        // Load existing options for select and weekly_schedule columns
         if (column.column_type === 'select' || column.column_type === 'weekly_schedule') {
           const extractedOptions = safeExtractOptions(column.options);
-          console.log('Loading existing options:', extractedOptions);
+          console.log('Loading options for', column.column_type, ':', extractedOptions);
           setOptions(extractedOptions);
         } else {
           setOptions([]);
         }
 
-        // Load existing year for calendar_weeks columns
         if (column.column_type === 'calendar_weeks') {
           const extractedYear = safeExtractCalendarYear(column.options);
-          console.log('Loading existing calendar year:', extractedYear);
+          console.log('Loading calendar year:', extractedYear);
           setCalendarYear(extractedYear);
         } else {
           setCalendarYear(getCurrentYear());
@@ -113,8 +105,9 @@ export const ColumnConfigModal = ({
 
   const addOption = () => {
     try {
-      if (newOption.trim() && !options.includes(newOption.trim())) {
-        setOptions([...options, newOption.trim()]);
+      const trimmedOption = newOption.trim();
+      if (trimmedOption && !options.includes(trimmedOption)) {
+        setOptions(prev => [...prev, trimmedOption]);
         setNewOption('');
       }
     } catch (error) {
@@ -124,7 +117,7 @@ export const ColumnConfigModal = ({
 
   const removeOption = (index: number) => {
     try {
-      setOptions(options.filter((_, i) => i !== index));
+      setOptions(prev => prev.filter((_, i) => i !== index));
     } catch (error) {
       console.error('Error removing option:', error);
     }
@@ -132,9 +125,12 @@ export const ColumnConfigModal = ({
 
   const updateOption = (index: number, value: string) => {
     try {
-      const newOptions = [...options];
-      newOptions[index] = value;
-      setOptions(newOptions);
+      const trimmedValue = value.trim();
+      setOptions(prev => {
+        const newOptions = [...prev];
+        newOptions[index] = trimmedValue;
+        return newOptions;
+      });
     } catch (error) {
       console.error('Error updating option:', error);
     }
@@ -142,15 +138,17 @@ export const ColumnConfigModal = ({
 
   const handleSave = async () => {
     try {
-      let finalOptions: any = undefined;
+      let finalOptions: any = null;
 
       if (columnType === 'select' || columnType === 'weekly_schedule') {
-        finalOptions = options.length > 0 ? options : undefined;
+        // Nur nicht-leere Optionen speichern
+        const validOptions = options.filter(opt => opt.trim().length > 0);
+        finalOptions = validOptions.length > 0 ? validOptions : null;
+        console.log('Saving options for', columnType, ':', finalOptions);
       } else if (columnType === 'calendar_weeks') {
         finalOptions = { year: calendarYear };
+        console.log('Saving calendar year:', finalOptions);
       }
-
-      console.log('Saving column with options:', finalOptions);
 
       await updateColumnMutation.mutateAsync({
         columnId: column.id,
@@ -176,13 +174,14 @@ export const ColumnConfigModal = ({
 
   const handleColumnTypeChange = (value: string) => {
     try {
-      setColumnType(value as ColumnType);
+      const newType = value as ColumnType;
+      setColumnType(newType);
       
-      // Reset options when changing column type
-      if (value !== 'select' && value !== 'weekly_schedule') {
+      // Reset nur wenn Typ wechselt
+      if (newType !== 'select' && newType !== 'weekly_schedule') {
         setOptions([]);
       }
-      if (value !== 'calendar_weeks') {
+      if (newType !== 'calendar_weeks') {
         setCalendarYear(getCurrentYear());
       }
     } catch (error) {
@@ -227,7 +226,12 @@ export const ColumnConfigModal = ({
                 min="2020"
                 max="2030"
                 value={calendarYear}
-                onChange={(e) => setCalendarYear(parseInt(e.target.value) || getCurrentYear())}
+                onChange={(e) => {
+                  const year = parseInt(e.target.value);
+                  if (!isNaN(year)) {
+                    setCalendarYear(year);
+                  }
+                }}
                 className="w-full"
               />
             </div>
@@ -236,20 +240,22 @@ export const ColumnConfigModal = ({
           {shouldShowOptions && (
             <div>
               <Label>
-                {columnType === 'select' ? 'Auswahloptionen' : 'Kategorien'}
+                {columnType === 'select' ? 'Auswahloptionen' : 'Kategorien für Wochenplan'}
               </Label>
               <div className="space-y-2">
                 {options.map((option, index) => (
-                  <div key={index} className="flex items-center gap-2">
+                  <div key={`option-${index}-${option}`} className="flex items-center gap-2">
                     <Input
                       value={option}
                       onChange={(e) => updateOption(index, e.target.value)}
                       className="flex-1"
+                      placeholder="Option eingeben..."
                     />
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => removeOption(index)}
+                      type="button"
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -274,6 +280,7 @@ export const ColumnConfigModal = ({
                     size="sm"
                     onClick={addOption}
                     disabled={!newOption.trim()}
+                    type="button"
                   >
                     <Plus className="w-4 h-4" />
                   </Button>
@@ -284,10 +291,14 @@ export const ColumnConfigModal = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} type="button">
             Abbrechen
           </Button>
-          <Button onClick={handleSave} disabled={updateColumnMutation.isPending}>
+          <Button 
+            onClick={handleSave} 
+            disabled={updateColumnMutation.isPending}
+            type="button"
+          >
             {updateColumnMutation.isPending ? 'Speichert...' : 'Speichern'}
           </Button>
         </DialogFooter>

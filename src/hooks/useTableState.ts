@@ -110,13 +110,16 @@ export const useTableState = (
           year = (column.options as any)?.year;
         }
         
-        // Safely extract options for weekly_schedule and select types
+        // Sichere Extraktion von Optionen für weekly_schedule und select
         let options;
         if ((column.column_type === 'weekly_schedule' || column.column_type === 'select') && column.options) {
           try {
-            // Ensure options is always an array
             if (Array.isArray(column.options)) {
-              options = column.options;
+              // Filtere null/undefined Werte und konvertiere zu Strings
+              options = column.options
+                .filter(opt => opt != null)
+                .map(opt => String(opt).trim())
+                .filter(opt => opt.length > 0);
             } else {
               console.log('Column options is not an array:', column.options);
               options = [];
@@ -176,7 +179,14 @@ export const useTableState = (
       let options;
       try {
         if ((col.column_type === 'weekly_schedule' || col.column_type === 'select') && col.options) {
-          options = Array.isArray(col.options) ? col.options : [];
+          if (Array.isArray(col.options)) {
+            options = col.options
+              .filter(opt => opt != null)
+              .map(opt => String(opt).trim())
+              .filter(opt => opt.length > 0);
+          } else {
+            options = [];
+          }
         } else {
           options = col.options as string[] | undefined;
         }
