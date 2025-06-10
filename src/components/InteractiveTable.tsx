@@ -1,11 +1,13 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Edit, Settings, Plus, Trash } from "lucide-react";
+import { useTableColumns, useTableData, useUpdateCellValue } from "@/hooks/useTableData";
+import { Tables } from "@/integrations/supabase/types";
 
 type CellType = 'text' | 'checkbox' | 'select';
 type TableMode = 'view' | 'edit' | 'structure';
@@ -13,107 +15,98 @@ type TableMode = 'view' | 'edit' | 'structure';
 interface CellData {
   value: any;
   type: CellType;
-  options?: string[]; // For select type
-}
-
-interface TableColumn {
-  id: string;
-  name: string;
-  type: CellType;
   options?: string[];
 }
 
 interface InteractiveTableProps {
   tableName: string;
-  initialData?: CellData[][];
-  initialColumns?: TableColumn[];
+  tableId: string;
   canEdit?: boolean;
   canStructure?: boolean;
 }
 
 export const InteractiveTable = ({ 
   tableName, 
-  initialData = [], 
-  initialColumns = [],
+  tableId,
   canEdit = true,
   canStructure = true 
 }: InteractiveTableProps) => {
   const [mode, setMode] = useState<TableMode>('view');
-  const [columns, setColumns] = useState<TableColumn[]>(
-    initialColumns.length > 0 ? initialColumns : [
-      { id: '1', name: 'Spalte 1', type: 'text' },
-      { id: '2', name: 'Spalte 2', type: 'checkbox' },
-      { id: '3', name: 'Spalte 3', type: 'select', options: ['Option 1', 'Option 2', 'Option 3'] }
-    ]
-  );
-  const [data, setData] = useState<CellData[][]>(
-    initialData.length > 0 ? initialData : Array(5).fill(null).map(() => 
-      columns.map(col => ({
-        value: col.type === 'checkbox' ? false : col.type === 'select' ? '' : '',
-        type: col.type,
-        options: col.options
-      }))
-    )
-  );
+  const { data: columns = [], isLoading: columnsLoading } = useTableColumns(tableId);
+  const { data: tableData = [], isLoading: dataLoading } = useTableData(tableId);
+  const updateCellMutation = useUpdateCellValue();
 
-  const updateCellValue = (rowIndex: number, colIndex: number, value: any) => {
+  // Transform database data into the component's expected format
+  const [data, setData] = useState<CellData[][]>([]);
+
+  useEffect(() => {
+    if (columns.length && tableData.length >= 0) {
+      // Get the maximum row index to determine how many rows we have
+      const maxRowIndex = Math.max(...tableData.map(d => d.row_index), -1);
+      const numRows = maxRowIndex + 1;
+
+      // Create a 2D array for the table data
+      const transformedData: CellData[][] = [];
+      
+      for (let rowIndex = 0; rowIndex < Math.max(numRows, 5); rowIndex++) {
+        const row: CellData[] = [];
+        
+        for (let colIndex = 0; colIndex < columns.length; colIndex++) {
+          const column = columns[colIndex];
+          const cellData = tableData.find(
+            d => d.row_index === rowIndex && d.column_id === column.id
+          );
+          
+          row.push({
+            value: cellData?.value || (column.column_type === 'checkbox' ? false : ''),
+            type: column.column_type as CellType,
+            options: column.options as string[] | undefined,
+          });
+        }
+        
+        transformedData.push(row);
+      }
+      
+      setData(transformedData);
+    }
+  }, [columns, tableData]);
+
+  const updateCellValue = async (rowIndex: number, colIndex: number, value: any) => {
+    // Update local state immediately for better UX
     const newData = [...data];
     newData[rowIndex][colIndex] = { ...newData[rowIndex][colIndex], value };
     setData(newData);
-    // Here would be auto-save functionality
-    console.log('Auto-saving...', { rowIndex, colIndex, value });
+
+    // Update in database
+    const column = columns[colIndex];
+    if (column) {
+      try {
+        await updateCellMutation.mutateAsync({
+          tableId,
+          rowIndex,
+          columnId: column.id,
+          value,
+        });
+      } catch (error) {
+        console.error('Error updating cell:', error);
+        // Revert local state on error
+        const revertedData = [...data];
+        revertedData[rowIndex][colIndex] = { 
+          ...revertedData[rowIndex][colIndex], 
+          value: tableData.find(d => d.row_index === rowIndex && d.column_id === column.id)?.value || ''
+        };
+        setData(revertedData);
+      }
+    }
   };
 
   const addRow = () => {
     const newRow = columns.map(col => ({
-      value: col.type === 'checkbox' ? false : '',
-      type: col.type,
-      options: col.options
+      value: col.column_type === 'checkbox' ? false : '',
+      type: col.column_type as CellType,
+      options: col.options as string[] | undefined
     }));
     setData([...data, newRow]);
-  };
-
-  const addColumn = () => {
-    const newColumn: TableColumn = {
-      id: Date.now().toString(),
-      name: `Neue Spalte`,
-      type: 'text'
-    };
-    setColumns([...columns, newColumn]);
-    
-    const newData = data.map(row => [
-      ...row,
-      { 
-        value: '', 
-        type: 'text' as CellType,
-        options: undefined
-      }
-    ]);
-    setData(newData);
-  };
-
-  const updateColumnType = (colIndex: number, newType: CellType) => {
-    const newColumns = [...columns];
-    newColumns[colIndex] = { ...newColumns[colIndex], type: newType };
-    
-    if (newType === 'select' && !newColumns[colIndex].options) {
-      newColumns[colIndex].options = ['Option 1', 'Option 2'];
-    }
-    
-    setColumns(newColumns);
-    
-    // Update data types
-    const newData = data.map(row => {
-      const newRow = [...row];
-      newRow[colIndex] = {
-        ...newRow[colIndex],
-        type: newType,
-        value: newType === 'checkbox' ? false : '',
-        options: newColumns[colIndex].options
-      };
-      return newRow;
-    });
-    setData(newData);
   };
 
   const renderCell = (cell: CellData, rowIndex: number, colIndex: number) => {
@@ -176,6 +169,20 @@ export const InteractiveTable = ({
     }
   };
 
+  if (columnsLoading || dataLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">{tableName}</h2>
+        </div>
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Lade Tabellendaten...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -219,45 +226,11 @@ export const InteractiveTable = ({
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
-                {columns.map((column, colIndex) => (
+                {columns.map((column) => (
                   <th key={column.id} className="p-3 text-left font-medium">
-                    {mode === 'structure' ? (
-                      <div className="space-y-2">
-                        <Input
-                          value={column.name}
-                          onChange={(e) => {
-                            const newColumns = [...columns];
-                            newColumns[colIndex].name = e.target.value;
-                            setColumns(newColumns);
-                          }}
-                          className="font-medium"
-                        />
-                        <Select
-                          value={column.type}
-                          onValueChange={(value: CellType) => updateColumnType(colIndex, value)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-background">
-                            <SelectItem value="text">Text</SelectItem>
-                            <SelectItem value="checkbox">Checkbox</SelectItem>
-                            <SelectItem value="select">Dropdown</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : (
-                      column.name
-                    )}
+                    {column.name}
                   </th>
                 ))}
-                {mode === 'structure' && (
-                  <th className="p-3 w-16">
-                    <Button size="sm" onClick={addColumn} variant="ghost">
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </th>
-                )}
               </tr>
             </thead>
             <tbody>
@@ -268,20 +241,6 @@ export const InteractiveTable = ({
                       {renderCell(cell, rowIndex, colIndex)}
                     </td>
                   ))}
-                  {mode === 'structure' && (
-                    <td className="p-3">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          const newData = data.filter((_, i) => i !== rowIndex);
-                          setData(newData);
-                        }}
-                      >
-                        <Trash className="w-4 h-4" />
-                      </Button>
-                    </td>
-                  )}
                 </tr>
               ))}
             </tbody>

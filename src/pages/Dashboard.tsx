@@ -6,76 +6,66 @@ import { CreateTableModal } from "@/components/CreateTableModal";
 import { InteractiveTable } from "@/components/InteractiveTable";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-
-const mockTables = [
-  {
-    id: "1",
-    name: "Projektübersicht",
-    description: "Verfolgung aller laufenden Projekte",
-    rows: 12,
-    columns: 6,
-    lastModified: "vor 2 Stunden",
-    permissions: 'owner' as const,
-    collaborators: 3
-  },
-  {
-    id: "2",
-    name: "Kundendaten",
-    description: "Kundeninformationen und Kontaktdaten",
-    rows: 45,
-    columns: 8,
-    lastModified: "gestern",
-    permissions: 'edit' as const,
-    collaborators: 2
-  },
-  {
-    id: "3",
-    name: "Inventar",
-    description: "Bestandsverwaltung und Lagerübersicht",
-    rows: 89,
-    columns: 5,
-    lastModified: "vor 3 Tagen",
-    permissions: 'view' as const,
-    collaborators: 1
-  }
-];
-
-const mockUser = {
-  name: "Max Mustermann",
-  email: "max@example.com"
-};
+import { useAuth } from "@/contexts/AuthContext";
+import { useTables, useCreateTable } from "@/hooks/useTables";
+import { useToast } from "@/hooks/use-toast";
 
 export const Dashboard = () => {
+  const { user, signOut } = useAuth();
+  const { data: tables = [], isLoading } = useTables();
+  const createTableMutation = useCreateTable();
+  const { toast } = useToast();
+  
   const [currentView, setCurrentView] = useState<'dashboard' | 'table'>('dashboard');
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [tables, setTables] = useState(mockTables);
 
   const handleOpenTable = (tableId: string) => {
     setSelectedTable(tableId);
     setCurrentView('table');
   };
 
-  const handleCreateTable = (tableData: any) => {
-    const newTable = {
-      id: Date.now().toString(),
-      name: tableData.name,
-      description: tableData.description,
-      rows: tableData.rows,
-      columns: tableData.columns,
-      lastModified: "gerade eben",
-      permissions: 'owner' as const,
-      collaborators: 1
-    };
-    setTables([...tables, newTable]);
+  const handleCreateTable = async (tableData: any) => {
+    try {
+      await createTableMutation.mutateAsync({
+        name: tableData.name,
+        description: tableData.description,
+        columnHeaders: tableData.columnHeaders,
+      });
+      toast({
+        title: "Tabelle erstellt",
+        description: `Die Tabelle "${tableData.name}" wurde erfolgreich erstellt.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Fehler beim Erstellen",
+        description: error.message || "Ein Fehler ist aufgetreten",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const selectedTableData = tables.find(t => t.id === selectedTable);
 
   if (currentView === 'table' && selectedTableData) {
+    const userPermission = selectedTableData.owner_id === user?.id 
+      ? 'owner' 
+      : selectedTableData.table_permissions.find(p => p.user_id === user?.id)?.permission || 'viewer';
+
     return (
       <div className="min-h-screen bg-background">
-        <Header user={mockUser} />
+        <Header user={{ 
+          name: user?.user_metadata?.full_name || user?.email || 'Benutzer',
+          email: user?.email || '' 
+        }} />
         <div className="container mx-auto px-4 py-6">
           <div className="mb-6">
             <Button
@@ -89,9 +79,27 @@ export const Dashboard = () => {
           </div>
           <InteractiveTable
             tableName={selectedTableData.name}
-            canEdit={selectedTableData.permissions !== 'view'}
-            canStructure={selectedTableData.permissions === 'owner'}
+            tableId={selectedTableData.id}
+            canEdit={userPermission !== 'viewer'}
+            canStructure={userPermission === 'owner'}
           />
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header user={{ 
+          name: user?.user_metadata?.full_name || user?.email || 'Benutzer',
+          email: user?.email || '' 
+        }} />
+        <div className="container mx-auto px-4 py-6">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Lade Tabellen...</p>
+          </div>
         </div>
       </div>
     );
@@ -100,9 +108,12 @@ export const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header 
-        user={mockUser} 
+        user={{ 
+          name: user?.user_metadata?.full_name || user?.email || 'Benutzer',
+          email: user?.email || '' 
+        }}
         onCreateTable={() => setIsCreateModalOpen(true)}
-        onLogout={() => console.log('Logout')}
+        onLogout={handleLogout}
       />
       
       <div className="container mx-auto px-4 py-6">
@@ -114,15 +125,30 @@ export const Dashboard = () => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tables.map((table) => (
-            <TableCard
-              key={table.id}
-              table={table}
-              onOpen={handleOpenTable}
-              onEdit={(id) => console.log('Edit table:', id)}
-              onManagePermissions={(id) => console.log('Manage permissions:', id)}
-            />
-          ))}
+          {tables.map((table) => {
+            const userPermission = table.owner_id === user?.id 
+              ? 'owner' 
+              : table.table_permissions.find(p => p.user_id === user?.id)?.permission || 'viewer';
+
+            return (
+              <TableCard
+                key={table.id}
+                table={{
+                  id: table.id,
+                  name: table.name,
+                  description: table.description || '',
+                  rows: 0, // Will be calculated from actual data
+                  columns: 0, // Will be calculated from actual data
+                  lastModified: new Date(table.updated_at).toLocaleDateString('de-DE'),
+                  permissions: userPermission as 'owner' | 'edit' | 'view',
+                  collaborators: table.table_permissions.length + 1,
+                }}
+                onOpen={handleOpenTable}
+                onEdit={(id) => console.log('Edit table:', id)}
+                onManagePermissions={(id) => console.log('Manage permissions:', id)}
+              />
+            );
+          })}
         </div>
         
         {tables.length === 0 && (

@@ -9,16 +9,216 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      table_columns: {
+        Row: {
+          column_order: number
+          column_type: Database["public"]["Enums"]["column_type"]
+          created_at: string
+          id: string
+          name: string
+          options: Json | null
+          table_id: string
+        }
+        Insert: {
+          column_order: number
+          column_type?: Database["public"]["Enums"]["column_type"]
+          created_at?: string
+          id?: string
+          name: string
+          options?: Json | null
+          table_id: string
+        }
+        Update: {
+          column_order?: number
+          column_type?: Database["public"]["Enums"]["column_type"]
+          created_at?: string
+          id?: string
+          name?: string
+          options?: Json | null
+          table_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "table_columns_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      table_data: {
+        Row: {
+          column_id: string
+          created_at: string
+          id: string
+          row_index: number
+          table_id: string
+          updated_at: string
+          value: Json | null
+        }
+        Insert: {
+          column_id: string
+          created_at?: string
+          id?: string
+          row_index: number
+          table_id: string
+          updated_at?: string
+          value?: Json | null
+        }
+        Update: {
+          column_id?: string
+          created_at?: string
+          id?: string
+          row_index?: number
+          table_id?: string
+          updated_at?: string
+          value?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "table_data_column_id_fkey"
+            columns: ["column_id"]
+            isOneToOne: false
+            referencedRelation: "table_columns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "table_data_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      table_permissions: {
+        Row: {
+          created_at: string
+          granted_by: string
+          id: string
+          permission: Database["public"]["Enums"]["permission_level"]
+          table_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by: string
+          id?: string
+          permission?: Database["public"]["Enums"]["permission_level"]
+          table_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string
+          id?: string
+          permission?: Database["public"]["Enums"]["permission_level"]
+          table_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "table_permissions_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "table_permissions_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "table_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tables: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tables_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_table_permission: {
+        Args: {
+          table_id: string
+          required_permission: Database["public"]["Enums"]["permission_level"]
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      column_type: "text" | "checkbox" | "select"
+      permission_level: "owner" | "editor" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +333,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      column_type: ["text", "checkbox", "select"],
+      permission_level: ["owner", "editor", "viewer"],
+    },
   },
 } as const
