@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -39,7 +38,7 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
         .from('table_permissions')
         .select(`
           *,
-          profiles!table_permissions_user_id_fkey(id, username, full_name)
+          profiles(id, username, full_name)
         `)
         .eq('table_id', tableId);
 
