@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +7,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import { AdminDashboard } from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +32,12 @@ const AppContent = () => {
           path="/login" 
           element={
             user ? <Navigate to="/" replace /> : <Login />
+          } 
+        />
+        <Route 
+          path="/admin" 
+          element={
+            user ? <AdminDashboard /> : <Navigate to="/login" replace />
           } 
         />
         <Route 
