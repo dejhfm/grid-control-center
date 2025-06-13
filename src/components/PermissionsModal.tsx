@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -38,8 +39,7 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
         .from('table_permissions')
         .select(`
           *,
-          user_profile:profiles!table_permissions_user_id_fkey(full_name, username, id),
-          granted_by_profile:profiles!table_permissions_granted_by_fkey(full_name, username)
+          profiles!table_permissions_user_id_fkey(id, username, full_name)
         `)
         .eq('table_id', tableId);
 
@@ -279,12 +279,12 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
                 <div key={permission.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex-1">
                     <span className="font-medium block">
-                      {permission.user_profile?.username || 'Unbekannter Benutzer'}
+                      {permission.profiles?.username || 'Unbekannter Benutzer'}
                     </span>
                     <div className="text-sm text-muted-foreground">
                       {permission.permission === 'viewer' ? 'Ansicht' : 'Bearbeitung'}
-                      {permission.user_profile?.full_name && (
-                        <span> • {permission.user_profile.full_name}</span>
+                      {permission.profiles?.full_name && (
+                        <span> • {permission.profiles.full_name}</span>
                       )}
                     </div>
                   </div>
