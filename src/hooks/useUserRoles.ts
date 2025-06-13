@@ -21,16 +21,29 @@ export const useUserRoles = () => {
     queryFn: async () => {
       if (!isAdmin) return [];
 
-      const { data, error } = await supabase
+      // First get all profiles
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          user_roles(*)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data as UserWithRole[];
+      if (profilesError) throw profilesError;
+
+      // Then get all user roles
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('is_active', true);
+
+      if (rolesError) throw rolesError;
+
+      // Combine the data manually
+      const usersWithRoles: UserWithRole[] = profiles.map(profile => ({
+        ...profile,
+        user_roles: userRoles.filter(role => role.user_id === profile.id)
+      }));
+
+      return usersWithRoles;
     },
     enabled: !!user && isAdmin,
   });
