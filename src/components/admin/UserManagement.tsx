@@ -1,14 +1,15 @@
 
-import React from 'react';
-import { useUserRoles, useUpdateUserRole } from '@/hooks/useUserRoles';
+import React, { useState } from 'react';
+import { useUserRoles, useUpdateUserRole, useDeleteUser } from '@/hooks/useUserRoles';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Database } from '@/integrations/supabase/types';
-import { Loader2, Mail, Calendar, Shield } from 'lucide-react';
+import { Loader2, Mail, Calendar, Shield, Trash2 } from 'lucide-react';
 
 type AppRole = Database['public']['Enums']['app_role'];
 
@@ -22,7 +23,7 @@ const ROLE_COLORS = {
 
 const ROLE_LABELS = {
   super_admin: 'Super Admin',
-  admin: 'Administrator',
+  admin: 'Administrator', 
   manager: 'Manager',
   user: 'Benutzer',
   restricted: 'Eingeschränkt'
@@ -31,6 +32,8 @@ const ROLE_LABELS = {
 export const UserManagement = () => {
   const { data: users, isLoading, error } = useUserRoles();
   const updateRoleMutation = useUpdateUserRole();
+  const deleteUserMutation = useDeleteUser();
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
   const handleRoleChange = (userId: string, newRole: AppRole, currentRole?: AppRole) => {
     updateRoleMutation.mutate({
@@ -38,6 +41,13 @@ export const UserManagement = () => {
       newRole,
       currentRole
     });
+  };
+
+  const handleDeleteUser = () => {
+    if (userToDelete) {
+      deleteUserMutation.mutate(userToDelete);
+      setUserToDelete(null);
+    }
   };
 
   if (isLoading) {
@@ -143,24 +153,59 @@ export const UserManagement = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Select
-                        value={currentRole || 'user'}
-                        onValueChange={(newRole: AppRole) => 
-                          handleRoleChange(user.id, newRole, currentRole)
-                        }
-                        disabled={updateRoleMutation.isPending}
-                      >
-                        <SelectTrigger className="w-40">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="restricted">Eingeschränkt</SelectItem>
-                          <SelectItem value="user">Benutzer</SelectItem>
-                          <SelectItem value="manager">Manager</SelectItem>
-                          <SelectItem value="admin">Administrator</SelectItem>
-                          <SelectItem value="super_admin">Super Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={currentRole || 'user'}
+                          onValueChange={(newRole: AppRole) => 
+                            handleRoleChange(user.id, newRole, currentRole)
+                          }
+                          disabled={updateRoleMutation.isPending}
+                        >
+                          <SelectTrigger className="w-40">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="restricted">Eingeschränkt</SelectItem>
+                            <SelectItem value="user">Benutzer</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="admin">Administrator</SelectItem>
+                            <SelectItem value="super_admin">Super Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deleteUserMutation.isPending}
+                              onClick={() => setUserToDelete(user.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Benutzer löschen</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Sind Sie sicher, dass Sie den Benutzer "{user.full_name || user.username}" löschen möchten? 
+                                Diese Aktion kann nicht rückgängig gemacht werden und wird alle zugehörigen Daten permanent entfernen.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel onClick={() => setUserToDelete(null)}>
+                                Abbrechen
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={handleDeleteUser}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Löschen
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

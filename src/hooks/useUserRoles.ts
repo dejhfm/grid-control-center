@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -109,6 +108,46 @@ export const useUpdateUserRole = () => {
       console.error('Error updating user role:', error);
       toast({
         title: 'Fehler beim Aktualisieren der Rolle',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+};
+
+export const useDeleteUser = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      // First delete the user's profile (this will cascade to user_roles due to foreign key)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (profileError) throw profileError;
+
+      // Log the admin action
+      await supabase.rpc('log_admin_action', {
+        _action: 'Deleted user account',
+        _target_type: 'user',
+        _target_id: userId,
+        _details: { action: 'user_deletion' }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-roles'] });
+      toast({
+        title: 'Benutzer gelöscht',
+        description: 'Der Benutzer wurde erfolgreich gelöscht.',
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error deleting user:', error);
+      toast({
+        title: 'Fehler beim Löschen',
         description: error.message,
         variant: 'destructive',
       });
