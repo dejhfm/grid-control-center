@@ -81,13 +81,6 @@ export type Database = {
             referencedRelation: "tables"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "file_audit_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
         ]
       }
       permission_audit: {
@@ -191,15 +184,7 @@ export type Database = {
           user_id?: string
           window_start?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "rate_limits_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       table_columns: {
         Row: {
@@ -311,24 +296,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "table_permissions_granted_by_fkey"
-            columns: ["granted_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "table_permissions_table_id_fkey"
             columns: ["table_id"]
             isOneToOne: false
             referencedRelation: "tables"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "table_permissions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -358,15 +329,7 @@ export type Database = {
           owner_id?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "tables_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_roles: {
         Row: {
@@ -408,6 +371,10 @@ export type Database = {
     Functions: {
       can_manage_user: {
         Args: { _manager_id: string; _target_id: string }
+        Returns: boolean
+      }
+      delete_user_completely: {
+        Args: { target_user_id: string }
         Returns: boolean
       }
       get_user_role: {

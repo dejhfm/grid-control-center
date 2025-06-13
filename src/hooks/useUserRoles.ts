@@ -121,34 +121,26 @@ export const useDeleteUser = () => {
 
   return useMutation({
     mutationFn: async (userId: string) => {
-      // First delete the user's profile (this will cascade to user_roles due to foreign key)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
-
-      if (profileError) throw profileError;
-
-      // Log the admin action
-      await supabase.rpc('log_admin_action', {
-        _action: 'Deleted user account',
-        _target_type: 'user',
-        _target_id: userId,
-        _details: { action: 'user_deletion' }
+      // Use the new database function to delete user completely
+      const { data, error } = await supabase.rpc('delete_user_completely', {
+        target_user_id: userId
       });
+
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-roles'] });
       toast({
         title: 'Benutzer gelöscht',
-        description: 'Der Benutzer wurde erfolgreich gelöscht.',
+        description: 'Der Benutzer wurde vollständig aus allen Systemen entfernt.',
       });
     },
     onError: (error: any) => {
       console.error('Error deleting user:', error);
       toast({
         title: 'Fehler beim Löschen',
-        description: error.message,
+        description: error.message || 'Ein unbekannter Fehler ist aufgetreten.',
         variant: 'destructive',
       });
     },
