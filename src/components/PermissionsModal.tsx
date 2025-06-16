@@ -21,6 +21,20 @@ interface UserSuggestion {
   full_name: string;
 }
 
+interface PermissionWithProfile {
+  id: string;
+  table_id: string;
+  user_id: string;
+  permission: 'viewer' | 'editor';
+  granted_by: string;
+  created_at: string;
+  user_profile: {
+    id: string;
+    username: string;
+    full_name: string;
+  } | null;
+}
+
 export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalProps) => {
   const [searchUsername, setSearchUsername] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -34,16 +48,35 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
   const { data: permissions = [] } = useQuery({
     queryKey: ['table-permissions', tableId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get the permissions
+      const { data: permissionsData, error: permissionsError } = await supabase
         .from('table_permissions')
-        .select(`
-          *,
-          profiles!table_permissions_user_id_fkey(id, username, full_name)
-        `)
+        .select('*')
         .eq('table_id', tableId);
 
-      if (error) throw error;
-      return data;
+      if (permissionsError) throw permissionsError;
+
+      // Then get the user profiles for each permission
+      const permissionsWithProfiles: PermissionWithProfile[] = [];
+      
+      for (const permission of permissionsData) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, username, full_name')
+          .eq('id', permission.user_id)
+          .single();
+
+        if (profileError) {
+          console.warn('Could not fetch profile for user:', permission.user_id);
+        }
+
+        permissionsWithProfiles.push({
+          ...permission,
+          user_profile: profile || null
+        });
+      }
+
+      return permissionsWithProfiles;
     },
     enabled: isOpen && !!tableId,
   });
@@ -278,12 +311,12 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
                 <div key={permission.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex-1">
                     <span className="font-medium block">
-                      {permission.profiles?.username || 'Unbekannter Benutzer'}
+                      {permission.user_profile?.username || 'Unbekannter Benutzer'}
                     </span>
                     <div className="text-sm text-muted-foreground">
                       {permission.permission === 'viewer' ? 'Ansicht' : 'Bearbeitung'}
-                      {permission.profiles?.full_name && (
-                        <span> • {permission.profiles.full_name}</span>
+                      {permission.user_profile?.full_name && (
+                        <span> • {permission.user_profile.full_name}</span>
                       )}
                     </div>
                   </div>
