@@ -38,7 +38,7 @@ export const PermissionsModal = ({ isOpen, onClose, tableId }: PermissionsModalP
         .from('table_permissions')
         .select(`
           *,
-          profiles(id, username, full_name)
+          profiles!table_permissions_user_id_fkey(id, username, full_name)
         `)
         .eq('table_id', tableId);
 
